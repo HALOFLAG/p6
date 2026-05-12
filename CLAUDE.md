@@ -2,6 +2,7 @@
 git config --local user.email "haloflag01@gmail.com"
 git config --local user.name "haloflag01"
 不可在我沒要求的情況下進行上傳。
+不可上傳 ./old_game_plan 中的檔案，裡面是舊遊戲資料。
 如果有資訊不足的地方，需要我說明的，或是更好的方法，請先詢問我。
 
 需要查找文件內容時，優先從 ./docs/文件目錄.md 開始找起。

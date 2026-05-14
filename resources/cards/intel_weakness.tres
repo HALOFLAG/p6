@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="CardDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/card_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "intel_weakness"
+card_name = "偵查"
+resource_class = "tool"
+function_class = "intel"
+card_form = "individual"
+weakness_type = "none"
+contribution = {}
+strength_level = 1
+lock_class = "optional"
+special_effect = {
+"spec_unlocked": {
+"action": "reveal_remaining_weakness_types",
+"scope": "current_battle_chain"
+},
+"display_text_unlocked": "不 lock:結束本擊時揭露此連戰所有剩餘敵人的弱點類型",
+"spec_locked": {
+"action": "reveal_weakness_type",
+"target": "current"
+},
+"display_text_locked": "Lock:即時揭露當前敵人弱點類型"
+}
+description = "情報卡。不 lock 換廣度;Lock 換深度"

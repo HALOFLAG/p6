@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/card_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "tool_stone_impact"
+card_name = "投石"
+resource_class = "tool"
+function_class = "combat"
+card_form = "pool"
+weakness_type = "impact"
+contribution = {
+"impact": 1
+}
+strength_level = 1
+lock_class = "none"
+special_effect = {}
+description = "對單一目標貢獻 +1 衝擊"

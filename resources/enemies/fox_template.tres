@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "fox"
+template_name = "狐狸"
+enemy_class = "rabbit"
+weakness_range = Array[String](["impact", "pierce"])
+combat_state_distribution = {
+"standard": 1.0
+}
+design_contract = {
+"teaches": "沒有弱點差異時要投注足夠資源",
+"veteran": "不用偵查,直接出 2 張任一類型",
+"novice": "NPC 會指出「使用力量不夠」"
+}
+traits = []

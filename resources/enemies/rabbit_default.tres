@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="EnemyInstance" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_instance.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+instance_id = "rabbit_default"
+template_id = "rabbit"
+requirements = {
+"impact": 3,
+"pierce": 1,
+"mixed": 5
+}
+strike_limit = 2
+combat_state = "standard"
+visual_cues = {
+"size": "small",
+"posture": "alert",
+"weapon": "none"
+}
+display_name = "兔子"

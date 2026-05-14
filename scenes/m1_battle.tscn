@@ -1,0 +1,122 @@
+[gd_scene format=3 uid="uid://bsl5eemhvwbkq"]
+
+[ext_resource type="Script" path="res://scripts/ui/m1_battle.gd" id="1"]
+
+[node name="M1Battle" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="VBox"]
+layout_mode = 2
+text = "P6 — M1 戰鬥核心(序章前半 4 敵人 / 3 卡型 / Place+Lock)"
+theme_override_font_sizes/font_size = 20
+
+[node name="EnemySelector" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="EnemySelectorTitle" type="Label" parent="VBox/EnemySelector"]
+layout_mode = 2
+text = "選擇敵人(按下立即重置戰鬥):"
+
+[node name="EnemyButtons" type="HBoxContainer" parent="VBox/EnemySelector"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EnemyPanel" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="EnemyLabel" type="RichTextLabel" parent="VBox/EnemyPanel"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+
+[node name="RevealedPanel" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="RevealedLabel" type="RichTextLabel" parent="VBox/RevealedPanel"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+
+[node name="HandPanel" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="HandPanelVBox" type="VBoxContainer" parent="VBox/HandPanel"]
+layout_mode = 2
+
+[node name="HandLabel" type="RichTextLabel" parent="VBox/HandPanel/HandPanelVBox"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+
+[node name="HandButtons" type="HBoxContainer" parent="VBox/HandPanel/HandPanelVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StrikePanel" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StrikePanelVBox" type="VBoxContainer" parent="VBox/StrikePanel"]
+layout_mode = 2
+
+[node name="StrikeTitle" type="Label" parent="VBox/StrikePanel/StrikePanelVBox"]
+layout_mode = 2
+text = "本擊區(放置中的卡可 Unplace / Lock):"
+
+[node name="StrikeScroll" type="ScrollContainer" parent="VBox/StrikePanel/StrikePanelVBox"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="StrikeContainer" type="VBoxContainer" parent="VBox/StrikePanel/StrikePanelVBox/StrikeScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="StrikeInfoLabel" type="Label" parent="VBox/StrikePanel/StrikePanelVBox"]
+layout_mode = 2
+text = "本擊張數:0 / 0"
+
+[node name="ButtonRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EndStrikeButton" type="Button" parent="VBox/ButtonRow"]
+layout_mode = 2
+text = "結束本擊"
+
+[node name="ResetButton" type="Button" parent="VBox/ButtonRow"]
+layout_mode = 2
+text = "重置戰鬥"
+
+[node name="ResultPanel" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ResultLabel" type="RichTextLabel" parent="VBox/ResultPanel"]
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true

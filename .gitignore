@@ -1,11 +1,14 @@
 # 舊遊戲資料(本地參考用,不上傳)
 old_game_plan/
 
-# Godot
+# Godot 4
 .godot/
 *.import
+*.translation
 export.cfg
 export_presets.cfg
+# 玩家本機資料(若 export 時生成)
+user_data/
 
 # C# / .NET
 bin/

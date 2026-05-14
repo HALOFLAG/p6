@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="CalibrationLines" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/calibration_lines.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+lines = {
+"big_overkill": {
+"player": "(佔位)用太多了。",
+"npc": "(佔位)這隻其實可以省一點資源。"
+},
+"precise": {
+"player": "(佔位)剛好。",
+"npc": "(佔位)這個判斷,記住。"
+},
+"barely_passed": {
+"player": "(佔位)好險。",
+"npc": "(佔位)剛好夠 —— 下次留點餘裕。"
+},
+"wrong_type": {
+"player": "(佔位)沒打中要害。",
+"npc": "(佔位)方向不對,再看清楚牠的弱點。"
+},
+"insufficient": {
+"player": "(佔位)差一點。",
+"npc": "(佔位)方向對了,資源再多一點就過了。"
+},
+"big_shortfall": {
+"player": "(佔位)完全不夠。",
+"npc": "(佔位)從頭重新判斷這隻。"
+}
+}

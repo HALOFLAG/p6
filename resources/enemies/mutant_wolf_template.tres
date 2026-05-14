@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "mutant_wolf"
+template_name = "異變的巨狼"
+enemy_class = "wolf"
+weakness_range = Array[String](["impact"])
+combat_state_distribution = {
+"standard": 1.0
+}
+design_contract = {
+"teaches": "菁英化的運作 + BOSS 級資源投入",
+"veteran": "看出視覺線索(體型 + 詛咒外觀),用整備 4 補給的全部投石擊殺",
+"novice": "對話傳遞「資源量根本不夠 / 方向錯了」的份量感"
+}
+traits = []

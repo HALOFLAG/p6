@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ChainDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/chain_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "chain_4"
+display_label = "連戰 4:狼群驗收"
+enemies = Array[String](["wolf_default", "wolf_default", "wolf_default"])
+tutorial_retry = false
+post_chain_supply = "supply_4"
+narrative_pre = "三道暗影在樹叢間穿梭。父親:「你已經學會了,接下來自己來。」"
+narrative_post = "狼群退散。父親把自己背袋裡剩下的箭與石全部交給兒子。"

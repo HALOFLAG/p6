@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="SupplyPhase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/supply_phase.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "rest_1"
+supply_type = "full_restore"
+cards_to_add = {}
+narrative = "完全休息,父親檢查兒子的裝備。消耗的卡片全部恢復。"

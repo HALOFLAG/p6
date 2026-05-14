@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ChainDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/chain_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "chain_1"
+display_label = "連戰 1:森林邊緣"
+enemies = Array[String](["rabbit_default", "rabbit_default", "rabbit_default"])
+tutorial_retry = true
+post_chain_supply = "rest_1"
+narrative_pre = "父親蹲下,示意兒子看草叢邊緣。「那個移動的——你說說看。」"
+narrative_post = "三隻兔子都倒下。父親點點頭:「不錯。記住這個——一擊,不要猶豫。」"

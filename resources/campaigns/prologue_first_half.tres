@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="CampaignDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/campaign_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "prologue_first_half"
+campaign_name = "序章前半:森林獵人父子"
+is_prologue = true
+starting_deck = {
+"tool_arrow_pierce": 10,
+"tool_stone_impact": 8,
+"intel_weakness": 2
+}
+chain_paths = Array[String]([
+"res://resources/chains/chain_1.tres",
+"res://resources/chains/chain_2.tres",
+"res://resources/chains/chain_3.tres",
+"res://resources/chains/chain_4.tres",
+"res://resources/chains/chain_5.tres"
+])
+supply_paths = {
+"rest_1": "res://resources/supply_phases/rest_1.tres",
+"supply_2": "res://resources/supply_phases/supply_2.tres",
+"supply_3": "res://resources/supply_phases/supply_3.tres",
+"supply_4": "res://resources/supply_phases/supply_4.tres"
+}
+prologue_narrative = "山林邊緣,晨霧未散。父親帶著兒子第一次進入真正的狩獵場。「今天,你來決定每一箭。」"
+ending_narrative = "父親拿起異變巨狼的斷臂,沉思良久。「這事我得獨自去查。你回家等我——或者,如果你準備好了,就來找我。」"

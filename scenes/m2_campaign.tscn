@@ -1,0 +1,142 @@
+[gd_scene format=3 uid="uid://ckx33ho0hub17"]
+
+[ext_resource type="Script" path="res://scripts/ui/m2_campaign.gd" id="1"]
+
+[node name="M2Campaign" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="Header" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="HeaderLabel" type="RichTextLabel" parent="VBox/Header"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+
+[node name="NarrativePanel" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="NarrativeVBox" type="VBoxContainer" parent="VBox/NarrativePanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="NarrativeLabel" type="RichTextLabel" parent="VBox/NarrativePanel/NarrativeVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = true
+
+[node name="NarrativeButtons" type="HBoxContainer" parent="VBox/NarrativePanel/NarrativeVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BattlePanel" type="PanelContainer" parent="VBox"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BattleVBox" type="VBoxContainer" parent="VBox/BattlePanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EnemySubPanel" type="PanelContainer" parent="VBox/BattlePanel/BattleVBox"]
+layout_mode = 2
+
+[node name="EnemyLabel" type="RichTextLabel" parent="VBox/BattlePanel/BattleVBox/EnemySubPanel"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+
+[node name="RevealedSubPanel" type="PanelContainer" parent="VBox/BattlePanel/BattleVBox"]
+layout_mode = 2
+
+[node name="RevealedLabel" type="RichTextLabel" parent="VBox/BattlePanel/BattleVBox/RevealedSubPanel"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+
+[node name="HandSubPanel" type="PanelContainer" parent="VBox/BattlePanel/BattleVBox"]
+layout_mode = 2
+
+[node name="HandVBox" type="VBoxContainer" parent="VBox/BattlePanel/BattleVBox/HandSubPanel"]
+layout_mode = 2
+
+[node name="HandLabel" type="RichTextLabel" parent="VBox/BattlePanel/BattleVBox/HandSubPanel/HandVBox"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+
+[node name="HandButtons" type="HBoxContainer" parent="VBox/BattlePanel/BattleVBox/HandSubPanel/HandVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StrikeSubPanel" type="PanelContainer" parent="VBox/BattlePanel/BattleVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StrikeVBox" type="VBoxContainer" parent="VBox/BattlePanel/BattleVBox/StrikeSubPanel"]
+layout_mode = 2
+
+[node name="StrikeTitle" type="Label" parent="VBox/BattlePanel/BattleVBox/StrikeSubPanel/StrikeVBox"]
+layout_mode = 2
+text = "本擊區:"
+
+[node name="StrikeScroll" type="ScrollContainer" parent="VBox/BattlePanel/BattleVBox/StrikeSubPanel/StrikeVBox"]
+custom_minimum_size = Vector2(0, 140)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="StrikeContainer" type="VBoxContainer" parent="VBox/BattlePanel/BattleVBox/StrikeSubPanel/StrikeVBox/StrikeScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="StrikeInfoLabel" type="Label" parent="VBox/BattlePanel/BattleVBox/StrikeSubPanel/StrikeVBox"]
+layout_mode = 2
+text = "本擊張數:0"
+
+[node name="BattleButtons" type="HBoxContainer" parent="VBox/BattlePanel/BattleVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EndStrikeButton" type="Button" parent="VBox/BattlePanel/BattleVBox/BattleButtons"]
+layout_mode = 2
+text = "結束本擊"
+
+[node name="AdvanceButton" type="Button" parent="VBox/BattlePanel/BattleVBox/BattleButtons"]
+layout_mode = 2
+text = "繼續"
+
+[node name="ResultSubPanel" type="PanelContainer" parent="VBox/BattlePanel/BattleVBox"]
+layout_mode = 2
+
+[node name="ResultLabel" type="RichTextLabel" parent="VBox/BattlePanel/BattleVBox/ResultSubPanel"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true

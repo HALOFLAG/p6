@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="EnemyInstance" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_instance.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+instance_id = "mutant_wolf_default"
+template_id = "mutant_wolf"
+requirements = {
+"impact": 5,
+"pierce": 8,
+"mixed": 12
+}
+strike_limit = 20
+combat_state = "standard"
+visual_cues = {
+"size": "massive",
+"posture": "menacing",
+"weapon": "claws_fangs",
+"marks": "scratches_bites_cursed_arm"
+}
+display_name = "異變的巨狼"

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="EnemyInstance" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_instance.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+instance_id = "fox_default"
+template_id = "fox"
+requirements = {
+"impact": 2,
+"pierce": 2,
+"mixed": 3
+}
+strike_limit = 4
+combat_state = "standard"
+visual_cues = {
+"size": "medium",
+"posture": "crouched",
+"weapon": "none"
+}
+display_name = "狐狸"

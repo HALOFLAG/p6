@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="SupplyPhase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/supply_phase.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "supply_2"
+supply_type = "add_cards"
+cards_to_add = {
+"tool_arrow_pierce": 2,
+"tool_stone_impact": 2
+}
+narrative = "父親從袋中取出補給:兩支箭、兩顆石。外面出現狼嚎,要小心。"

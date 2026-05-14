@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "wolf"
+template_name = "狼"
+enemy_class = "wolf"
+weakness_range = Array[String](["pierce"])
+combat_state_distribution = {
+"standard": 1.0
+}
+design_contract = {
+"teaches": "卡牌會被消耗 + 狼弱點 + 菁英化的運作",
+"veteran": "純看物種直接出 2 張射箭",
+"novice": "對話會點出「狼會回來找你,而且更難對付」"
+}
+traits = []

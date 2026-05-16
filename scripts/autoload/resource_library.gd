@@ -19,7 +19,7 @@ extends Node
 ## 找不到 id → push_error + 回 null。caller 自己負責容錯。
 ## 與既有 _load_resources 慣例一致(不改成 assert/crash)。
 ##
-## 對應 docs/adr/0001-resource-library-autoload.md 設計決策。
+## 對應 docs/A__Index_and_meta/adr/0001-resource-library-autoload.md 設計決策。
 
 # ============ 路徑表(新增資源在這裡註冊)============
 

@@ -8,7 +8,6 @@ extends Resource
 @export var campaign_name: String = ""
 @export var is_prologue: bool = true
 @export var starting_deck: Dictionary = {}  ## { card_id: count }
-@export var chain_paths: Array[String] = []  ## 連戰 .tres 路徑序列
-@export var supply_paths: Dictionary = {}  ## { supply_id: tres_path }
+@export var chain_ids: Array[String] = []  ## 連戰 id 序列(透過 ResourceLibrary.chain(id) 取得)
 @export var prologue_narrative: String = ""  ## 戰役開場
 @export var ending_narrative: String = ""  ## 戰役末尾

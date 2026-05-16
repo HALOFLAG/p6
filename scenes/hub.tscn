@@ -11,75 +11,213 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="VBox" type="VBoxContainer" parent="."]
+[node name="Bg" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 24.0
-offset_top = 24.0
-offset_right = -24.0
-offset_bottom = -24.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 14
+mouse_filter = 2
+color = Color(0.18, 0.16, 0.14, 1)
 
-[node name="Title" type="Label" parent="VBox"]
-layout_mode = 2
-text = "P6 — Hub 中樞(M3 雛形)"
+[node name="HubScene" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="SceneFloor" type="ColorRect" parent="HubScene"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 60.0
+offset_top = 580.0
+offset_right = 1220.0
+offset_bottom = 605.0
+mouse_filter = 2
+color = Color(0.13, 0.11, 0.09, 1)
+
+[node name="SceneTitle" type="Label" parent="HubScene"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 40.0
+offset_top = 24.0
+offset_right = 360.0
+offset_bottom = 56.0
+mouse_filter = 2
+text = "P6 — 中樞"
 theme_override_font_sizes/font_size = 22
 
-[node name="NpcPanel" type="PanelContainer" parent="VBox"]
-layout_mode = 2
+[node name="SceneHint" type="Label" parent="HubScene"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 40.0
+offset_top = 58.0
+offset_right = 520.0
+offset_bottom = 80.0
+mouse_filter = 2
+text = "(點擊場景物件互動 — hub 場景佔位,美術 M6 補)"
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.54, 0.55, 0.59, 1)
 
-[node name="NpcLabel" type="RichTextLabel" parent="VBox/NpcPanel"]
-custom_minimum_size = Vector2(0, 70)
-layout_mode = 2
-bbcode_enabled = true
-fit_content = true
+[node name="FatherFigure" type="ColorRect" parent="HubScene"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 300.0
+offset_top = 180.0
+offset_right = 450.0
+offset_bottom = 440.0
+color = Color(0.55, 0.42, 0.32, 1)
 
-[node name="CampaignPanel" type="PanelContainer" parent="VBox"]
-layout_mode = 2
+[node name="FatherLabel" type="Label" parent="HubScene/FatherFigure"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+text = "父親"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="CampaignVBox" type="VBoxContainer" parent="VBox/CampaignPanel"]
-layout_mode = 2
-theme_override_constants/separation = 8
+[node name="BookShelf" type="ColorRect" parent="HubScene"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 700.0
+offset_top = 160.0
+offset_right = 880.0
+offset_bottom = 500.0
+color = Color(0.38, 0.25, 0.16, 1)
 
-[node name="CampaignTitle" type="Label" parent="VBox/CampaignPanel/CampaignVBox"]
-layout_mode = 2
+[node name="BookShelfLabel" type="Label" parent="HubScene/BookShelf"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+text = "書架"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="JournalBook" type="ColorRect" parent="HubScene"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 540.0
+offset_top = 320.0
+offset_right = 660.0
+offset_bottom = 440.0
+color = Color(0.45, 0.32, 0.20, 1)
+
+[node name="JournalBookLabel" type="Label" parent="HubScene/JournalBook"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+text = "日誌本"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SouvenirLayer" type="Control" parent="HubScene"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="CampaignScreen" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="CampaignBg" type="ColorRect" parent="CampaignScreen"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.1, 0.11, 0.13, 1)
+
+[node name="BackButton" type="Button" parent="CampaignScreen"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 40.0
+offset_top = 40.0
+offset_right = 200.0
+offset_bottom = 76.0
+text = "← 返回中樞"
+
+[node name="CampaignTitle" type="Label" parent="CampaignScreen"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 40.0
+offset_bottom = 80.0
 text = "戰役選擇"
-theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 22
 
-[node name="CampaignButton" type="Button" parent="VBox/CampaignPanel/CampaignVBox"]
+[node name="CenterStack" type="CenterContainer" parent="CampaignScreen"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Card" type="PanelContainer" parent="CampaignScreen/CenterStack"]
+custom_minimum_size = Vector2(520, 220)
 layout_mode = 2
-text = "進入序章前半:森林獵人父子"
 
-[node name="CampaignStatusLabel" type="Label" parent="VBox/CampaignPanel/CampaignVBox"]
+[node name="CardMargin" type="MarginContainer" parent="CampaignScreen/CenterStack/Card"]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 24
+
+[node name="CardVBox" type="VBoxContainer" parent="CampaignScreen/CenterStack/Card/CardMargin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="NameLabel" type="Label" parent="CampaignScreen/CenterStack/Card/CardMargin/CardVBox"]
+layout_mode = 2
+text = "序章前半:森林獵人父子"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+
+[node name="StatusLabel" type="Label" parent="CampaignScreen/CenterStack/Card/CardMargin/CardVBox"]
 layout_mode = 2
 text = "狀態:尚未完成"
+horizontal_alignment = 1
 
-[node name="SouvenirPanel" type="PanelContainer" parent="VBox"]
-visible = false
+[node name="EnterButton" type="Button" parent="CampaignScreen/CenterStack/Card/CardMargin/CardVBox"]
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
+text = "進入戰役"
 
-[node name="SouvenirLabel" type="RichTextLabel" parent="VBox/SouvenirPanel"]
-custom_minimum_size = Vector2(0, 60)
-layout_mode = 2
-bbcode_enabled = true
-fit_content = true
+[node name="DevPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -120.0
+offset_right = -16.0
+offset_bottom = -16.0
 
-[node name="Spacer" type="Control" parent="VBox"]
+[node name="DevContent" type="VBoxContainer" parent="DevPanel"]
 layout_mode = 2
-size_flags_vertical = 3
+theme_override_constants/separation = 4
 
-[node name="DevRow" type="HBoxContainer" parent="VBox"]
+[node name="DevLabel" type="Label" parent="DevPanel/DevContent"]
 layout_mode = 2
+text = "[DEV] 測試"
 
-[node name="DevLabel" type="Label" parent="VBox/DevRow"]
+[node name="ResetButton" type="Button" parent="DevPanel/DevContent"]
 layout_mode = 2
-text = "[開發測試]"
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+text = "重置進度"
 
-[node name="ResetProgressButton" type="Button" parent="VBox/DevRow"]
+[node name="ReturnMenuButton" type="Button" parent="DevPanel/DevContent"]
 layout_mode = 2
-text = "清除所有進度"
+text = "回主選單"

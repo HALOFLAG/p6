@@ -16,7 +16,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="P6"
 config/description="P6 — OHK 卡牌戰術遊戲(序章前半 M0)"
-run/main_scene="res://scenes/hub.tscn"
+run/main_scene="res://scenes/title_screen.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
@@ -26,6 +26,8 @@ EventBus="*res://scripts/autoload/event_bus.gd"
 CampaignContext="*res://scripts/autoload/campaign_context.gd"
 SaveSystem="*res://scripts/autoload/save_system.gd"
 GameState="*res://scripts/autoload/game_state.gd"
+AdventureRecord="*res://scripts/autoload/adventure_record.gd"
+ResourceLibrary="*res://scripts/autoload/resource_library.gd"
 
 [display]
 

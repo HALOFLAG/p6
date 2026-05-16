@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "gray_rabbit"
+template_name = "灰兔"
+enemy_class = "gray_rabbit"
+weakness_range = Array[String](["pierce"])
+combat_state_distribution = {
+"standard": 1.0
+}
+design_contract = {
+"teaches": "失敗代價的具體化 —— 沒擊殺會留下複製體,下一場立刻面對",
+"veteran": "純看物種直接出 1 張射箭 —— OHK 化解失敗代價",
+"novice": "失敗後對話會引導「上次太用力了嗎,結果跑出第二隻」"
+}
+traits = []

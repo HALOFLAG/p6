@@ -19,10 +19,11 @@ const TYPE_COLORS := {
 
 # ============ 敵人類別色 ============
 const ENEMY_CLASS_COLORS := {
-	"rabbit": Color("8fae6b"),    # 兔子型 — 草綠
-	"wolf": Color("a06a4a"),      # 狼型 — 棕
-	"leopard": Color("c2913e"),   # 豹型 — 土黃
-	"bear": Color("7a4a4a"),      # 熊型 — 暗紅棕
+	"rabbit": Color("8fae6b"),       # 兔子型 — 草綠
+	"gray_rabbit": Color("6e7e8f"),  # 灰兔型 — 偏藍灰(失敗 spawn clone 機制)
+	"wolf": Color("a06a4a"),         # 狼型 — 棕
+	"leopard": Color("c2913e"),      # 豹型 — 土黃
+	"bear": Color("7a4a4a"),         # 熊型 — 暗紅棕
 }
 
 # ============ 通用面板色 ============
@@ -100,6 +101,7 @@ static func type_label(type_key: String) -> String:
 static func enemy_class_label(cls: String) -> String:
 	match cls:
 		"rabbit": return "兔子型"
+		"gray_rabbit": return "灰兔型"
 		"wolf": return "狼型"
 		"leopard": return "豹型"
 		"bear": return "熊型"

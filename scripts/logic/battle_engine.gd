@@ -17,7 +17,7 @@ var enemy_instance: EnemyInstance
 var enemy_template: EnemyTemplate
 var deck: Array[DeckEntry] = []  ## 當前卡組(共享參考)
 var card_library: Dictionary = {}  ## { card_id: CardDefinition }
-var result: Dictionary = {}
+var result: StrikeResult = null  ## ADR-0003;commit_strike 前為 null
 
 ## 揭露資訊。M1 用單一敵人;M2+ 擴展為連戰範圍。
 ## { "enemy_weakness_type": "pierce", "enemy_class_revealed": true, ... }
@@ -52,7 +52,6 @@ func place_card(card_id: String) -> bool:
 	if card_def == null:
 		return false
 	strike.place(card_def)
-	EventBus.emit_card_placed(card_id)
 	return true
 
 
@@ -94,11 +93,11 @@ func lock_card_at(index: int) -> bool:
 ##  結束本擊 + 結算
 ## ====================
 
-func commit_strike() -> Dictionary:
+func commit_strike() -> StrikeResult:
 	if phase != Phase.PLACE:
 		return result
 	if strike.has_unlocked_required_cards():
-		return {}  ## required 卡未 lock,不允許 commit
+		return null  ## required 卡未 lock,不允許 commit
 	## 對剩餘 placed 的 optional 卡觸發 spec_unlocked
 	for card in strike.placed_cards:
 		if card.lock_class == "optional":
@@ -112,10 +111,7 @@ func commit_strike() -> Dictionary:
 			entry.consume(1)
 	## 結算
 	result = Resolution.resolve(strike, enemy_instance)
-	result["revealed_info"] = revealed_info.duplicate()
 	phase = Phase.RESOLVED
-	EventBus.emit_strike_committed()
-	EventBus.emit_resolution_complete(result)
 	return result
 
 
@@ -177,3 +173,15 @@ func can_commit() -> bool:
 	if strike.has_unlocked_required_cards():
 		return false
 	return true
+
+
+## 該卡組目前可 place 的張數。
+## PLACE 階段 = remaining - in_strike;RESOLVED 階段 = remaining(locked 卡已於 commit_strike 從卡組消耗,不再扣)。
+## 把「PLACE/RESOLVED 雙減 bug」風險集中到引擎一處。對應 ADR-0002 Candidate 2。
+func available_count(card_id: String) -> int:
+	var entry := _find_entry(card_id)
+	if entry == null:
+		return 0
+	if phase == Phase.PLACE:
+		return entry.count_remaining - _count_in_strike(card_id)
+	return entry.count_remaining

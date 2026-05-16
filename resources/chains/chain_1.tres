@@ -6,8 +6,8 @@
 script = ExtResource("1")
 id = "chain_1"
 display_label = "連戰 1:森林邊緣"
-enemies = Array[String](["rabbit_default", "rabbit_default", "rabbit_default"])
-tutorial_retry = true
+enemies = Array[String](["gray_rabbit_default", "gray_rabbit_default", "gray_rabbit_default"])
+tutorial_retry = false
 post_chain_supply = "rest_1"
-narrative_pre = "父親蹲下,示意兒子看草叢邊緣。「那個移動的——你說說看。」"
-narrative_post = "三隻兔子都倒下。父親點點頭:「不錯。記住這個——一擊,不要猶豫。」"
+narrative_pre = "父親蹲下,示意兒子看草叢邊緣。「那個灰灰的——你說說看。」"
+narrative_post = "灰兔群終於都倒下。父親點點頭:「不錯。記住這個——一擊,不要猶豫。沒擊中的代價會留下來找你。」"

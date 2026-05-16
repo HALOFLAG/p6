@@ -188,7 +188,8 @@ func _build_map() -> void:
 
 func _make_battle_node(record: BattleRecord, timeline_idx: int) -> Control:
 	var node := ColorRect.new()
-	var color: Color = UiPalette.OK_COLOR if record.ohk else UiPalette.FAIL_COLOR
+	var rec_ohk: bool = record.result != null and record.result.ohk
+	var color: Color = UiPalette.OK_COLOR if rec_ohk else UiPalette.FAIL_COLOR
 	if record.is_elite:
 		color = color.darkened(0.2)
 	node.color = color
@@ -197,7 +198,7 @@ func _make_battle_node(record: BattleRecord, timeline_idx: int) -> Control:
 	var tmpl: EnemyTemplate = ResourceLibrary.enemy_template(record.enemy_template_id)
 	var short_name := tmpl.template_name if tmpl != null else record.enemy_template_id
 	var prefix := "⚠" if record.is_elite else ""
-	var suffix := "\n✗" if not record.ohk else ""
+	var suffix := "\n✗" if not rec_ohk else ""
 	var lbl := Label.new()
 	lbl.text = "%s%s%s" % [prefix, short_name, suffix]
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -340,22 +341,14 @@ func _render_battle_page(record: BattleRecord) -> void:
 			revealed_lbl.add_theme_font_size_override("font_size", 12)
 			rvbox.add_child(revealed_lbl)
 
-	## 需求 bar 組(用 record 重組成 result-like dict)
-	var result_dict := {
-		"ohk": record.ohk,
-		"passing_paths": record.passing_paths,
-		"contributions": record.contributions,
-		"mixed_count": record.mixed_count,
-		"requirements": record.requirements,
-		"shortfalls": record.shortfalls,
-	}
-	rvbox.add_child(RequirementBar.build_group(result_dict))
+	## 需求 bar 組(typed StrikeResult,ADR-0003)
+	rvbox.add_child(RequirementBar.build_group(record.result))
 
 	## 結果橫幅
 	var verdict := Label.new()
-	if record.ohk:
+	if record.result != null and record.result.ohk:
 		var path_locs: Array[String] = []
-		for p in record.passing_paths:
+		for p in record.result.passing_paths:
 			path_locs.append(UiPalette.type_label(p))
 		verdict.text = "✓ OHK 成立(%s)" % ", ".join(path_locs)
 		verdict.add_theme_color_override("font_color", UiPalette.OK_COLOR)
@@ -443,7 +436,9 @@ func _render_prep_page(record: PrepNodeRecord) -> void:
 		chips.add_child(none)
 	else:
 		for cid in record.changes:
-			chips.add_child(_make_supply_chip(cid, int(record.changes[cid])))
+			var chip := SupplyChip.new()
+			chip.setup(cid, int(record.changes[cid]))
+			chips.add_child(chip)
 
 	rvbox.add_child(HSeparator.new())
 	var total_before := _pool_total(record.card_pool_before)
@@ -473,32 +468,6 @@ func _render_prep_page(record: PrepNodeRecord) -> void:
 
 
 # ============ 工具 ============
-
-func _make_supply_chip(card_id: String, delta: int) -> PanelContainer:
-	var card: CardDefinition = ResourceLibrary.card(card_id)
-	var cn := str(card_id)
-	var primary := "none"
-	if card != null:
-		cn = card.card_name
-		primary = UiPalette.card_primary_type(card)
-	var chip := PanelContainer.new()
-	chip.custom_minimum_size = Vector2(120, 64)
-	chip.add_theme_stylebox_override("panel", UiPalette.make_panel(UiPalette.PANEL_BG_LIGHT, UiPalette.type_color(primary), 2))
-	var vb := VBoxContainer.new()
-	chip.add_child(vb)
-	var name_lbl := Label.new()
-	name_lbl.text = cn
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_lbl.add_theme_color_override("font_color", UiPalette.TEXT_MAIN)
-	vb.add_child(name_lbl)
-	var delta_lbl := Label.new()
-	delta_lbl.text = "%s%d" % ["+" if delta >= 0 else "", delta]
-	delta_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	delta_lbl.add_theme_font_size_override("font_size", 18)
-	delta_lbl.add_theme_color_override("font_color", UiPalette.OK_COLOR if delta >= 0 else UiPalette.FAIL_COLOR)
-	vb.add_child(delta_lbl)
-	return chip
-
 
 func _failure_outcome_display(outcome_int: int) -> String:
 	match outcome_int:

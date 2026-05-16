@@ -60,16 +60,15 @@ func setup(type_key: String, actual: int, required: int) -> void:
 	_status_label.add_theme_color_override("font_color", UiPalette.OK_COLOR if hit else UiPalette.FAIL_COLOR)
 
 
-## 由結算結果(Resolution.resolve 的回傳)建一組 bar,塞進一個 VBoxContainer 回傳。
-static func build_group(result: Dictionary) -> VBoxContainer:
+## 由結算結果(typed StrikeResult,ADR-0003)建一組 bar,塞進一個 VBoxContainer 回傳。
+static func build_group(result: StrikeResult) -> VBoxContainer:
 	var group := VBoxContainer.new()
 	group.add_theme_constant_override("separation", 4)
-	var requirements: Dictionary = result.get("requirements", {})
-	var contributions: Dictionary = result.get("contributions", {})
-	var mixed_count: int = result.get("mixed_count", 0)
-	for type_key in requirements:
-		var required: int = requirements[type_key]
-		var actual: int = mixed_count if type_key == "mixed" else contributions.get(type_key, 0)
+	if result == null:
+		return group
+	for type_key in result.requirements:
+		var required: int = result.requirements[type_key]
+		var actual: int = result.mixed_count if type_key == "mixed" else result.contributions.get(type_key, 0)
 		var bar := RequirementBar.new()
 		group.add_child(bar)
 		bar.setup(type_key, actual, required)

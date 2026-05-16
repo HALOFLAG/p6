@@ -34,6 +34,7 @@ const ENEMY_TEMPLATE_PATHS := {
 	"fox": "res://resources/enemies/fox_template.tres",
 	"wolf": "res://resources/enemies/wolf_template.tres",
 	"mutant_wolf": "res://resources/enemies/mutant_wolf_template.tres",
+	"gray_rabbit": "res://resources/enemies/gray_rabbit_template.tres",
 }
 
 const ENEMY_INSTANCE_PATHS := {
@@ -41,6 +42,8 @@ const ENEMY_INSTANCE_PATHS := {
 	"fox_default": "res://resources/enemies/fox_default.tres",
 	"wolf_default": "res://resources/enemies/wolf_default.tres",
 	"mutant_wolf_default": "res://resources/enemies/mutant_wolf_default.tres",
+	"gray_rabbit_default": "res://resources/enemies/gray_rabbit_default.tres",
+	"gray_rabbit_clone": "res://resources/enemies/gray_rabbit_clone.tres",
 }
 
 const CHAIN_PATHS := {

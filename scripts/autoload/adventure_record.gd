@@ -9,7 +9,9 @@ extends Node
 ## - 唯一清除方式:clear_all()(僅供 [DEV] 重置使用)
 
 const SAVE_PATH := "user://battle_records.json"
-const VERSION := 1
+## v2(2026-05-16,ADR-0003):BattleRecord 內嵌 StrikeResult(原 6 個結算欄位移進 record.result)。
+## v1 disk file 讀回會在 _load_from_disk 偵測 → 自動清檔 + push_warning。
+const VERSION := 2
 
 var battles: Array[BattleRecord] = []
 var prep_nodes: Array[PrepNodeRecord] = []
@@ -91,7 +93,9 @@ func _update_indices_for_battle(idx: int, rec: BattleRecord) -> void:
 		_battles_by_enemy_template[rec.enemy_template_id] = []
 	(_battles_by_enemy_template[rec.enemy_template_id] as Array).append(idx)
 
-	if not rec.ohk:
+	## ohk 經 ADR-0003 後位於 rec.result 內;result 可能為 null(理論不該發生,防爆)
+	var is_ohk: bool = rec.result != null and rec.result.ohk
+	if not is_ohk:
 		_last_failure_by_enemy[rec.enemy_template_id] = idx
 
 	if not _battles_by_campaign.has(rec.campaign_id):
@@ -137,6 +141,13 @@ func _load_from_disk() -> void:
 		push_error("戰鬥紀錄 JSON 解析失敗")
 		return
 	var data: Dictionary = parsed
+	## Schema version check(ADR-0003):version 不符 → 自動清檔。
+	## v1→v2 是 BattleRecord 結算欄位重構,from_dict 形狀不相容。
+	var disk_version: int = int(data.get("version", 0))
+	if disk_version != VERSION:
+		push_warning("戰鬥紀錄 schema 版本不相容(disk=%d, code=%d),已重置紀錄。" % [disk_version, VERSION])
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+		return
 	for d in data.get("battles", []):
 		if d is Dictionary:
 			battles.append(BattleRecord.from_dict(d))

@@ -24,7 +24,6 @@ static func apply(phase: SupplyPhase, deck: Array[DeckEntry], starting_deck_dict
 			summary["changes"] = _diff(before, deck)
 		_:
 			push_warning("未知的 supply_type:" + phase.supply_type)
-	EventBus.emit_signal("supply_applied", phase.id)
 	return summary
 
 

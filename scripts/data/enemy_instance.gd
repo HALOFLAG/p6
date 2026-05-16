@@ -13,6 +13,14 @@ extends Resource
 @export var visual_cues: Dictionary = {}  ## 對應視覺線索詞彙表
 @export var display_name: String = ""  ## 顯示名稱(若空字串則由 template 提供)
 
+## 失敗/揭露/etc 的被動觸發效果(2026-05-16 新增,for 灰兔 spawn_clone 機制)。
+## 結構慣例(對齊 CardDefinition.special_effect):
+##   { "on_fail": { "action": "spawn_clone", "clone_instance_id": "..." } }
+## 目前 FailureHandler 認得的 on_fail action:
+##   - "spawn_clone" → 配套 GRAY_RABBIT_CLONE_SPAWN outcome
+## 預留 trigger key: on_reveal / on_chain_start 等(待後續期數)
+@export var special_effect: Dictionary = {}
+
 
 func get_min_requirement() -> int:
 	var lowest := INF

@@ -2,9 +2,11 @@ class_name FailureHandler
 extends RefCounted
 
 ## 失敗代價處理。對應 程式規格書.md §3.4 + 遊戲核心系統機制.md §5。
-## 序章前半失敗類型摘要:
-##   - 兔子 (rabbit): 連鎖逃跑 → 連戰中「所有兔子」(含當前這隻)逃走移出連戰;
-##                    非兔子敵人不受影響,連戰繼續(若 tutorial_retry 開啟則改為觸發重來)
+## 序章前半失敗類型摘要(2026-05-16 起):
+##   - 灰兔 default (gray_rabbit + on_fail/spawn_clone): default 逃走 + clone 插入緊接後位置
+##                                                        (chain_1 用此取代教學重來)
+##   - 灰兔 clone (gray_rabbit + 空 special_effect): 單獨逃走,連戰繼續(走 FOX_FLEE outcome)
+##   - 兔子 (rabbit): 連鎖逃跑(現役連戰已不再使用;若 tutorial_retry 開啟則改為觸發重來)
 ##   - 狐狸 (fox): 單獨逃跑 → 僅該狐狸移出,連戰繼續
 ##   - 狼型 (wolf): 菁英化 → 排到連戰末段(包含異變的巨狼)
 ##   - 精英狀態失敗: GAME OVER
@@ -12,11 +14,12 @@ extends RefCounted
 
 ## 結果類型:
 enum FailureOutcome {
-	TUTORIAL_RETRY,         ## 教學重來:回滾並重新開始連戰(僅連戰 1)
-	RABBIT_CHAIN_FLEE,      ## 兔子連鎖逃跑:所有兔子移出連戰,非兔子敵人留下,連戰繼續
-	FOX_FLEE,               ## 狐狸單獨逃跑:僅該敵人移出,連戰繼續
-	WOLF_ELITE_PROMOTION,   ## 狼/巨狼菁英化:排到連戰末段
-	GAME_OVER,              ## 戰役失敗
+	TUTORIAL_RETRY,             ## 教學重來:回滾並重新開始連戰(舊機制,2026-05-16 後 chain_1 已停用;TODO 灰兔機制跑順後評估清除)
+	RABBIT_CHAIN_FLEE,          ## 兔子連鎖逃跑:所有兔子移出連戰,非兔子敵人留下,連戰繼續
+	FOX_FLEE,                   ## 狐狸 / clone 等單獨逃跑:僅該敵人移出,連戰繼續
+	WOLF_ELITE_PROMOTION,       ## 狼/巨狼菁英化:排到連戰末段
+	GRAY_RABBIT_CLONE_SPAWN,    ## 灰兔失敗 default:default 逃走 + clone 插入緊接後位置(2026-05-16)
+	GAME_OVER,                  ## 戰役失敗
 }
 
 
@@ -52,6 +55,21 @@ static func resolve_failure(
 			return {
 				"outcome": FailureOutcome.RABBIT_CHAIN_FLEE,
 				"narrative": "兔子驚惶逃竄,連戰中其他兔子也跟著跑了。",
+			}
+		"gray_rabbit":
+			## 灰兔:讀 instance.special_effect 決定處置(2026-05-16,ADR 未獨立記)
+			var fail_spec: Dictionary = enemy_instance.special_effect.get("on_fail", {})
+			if fail_spec.get("action", "") == "spawn_clone":
+				## default 灰兔:default 逃走 + clone 插入緊接後
+				return {
+					"outcome": FailureOutcome.GRAY_RABBIT_CLONE_SPAWN,
+					"narrative": "灰兔甩開射程跳開 — 但留下一個跟著它跑的身影,下一步就到你眼前。",
+					"clone_instance_id": fail_spec.get("clone_instance_id", ""),
+				}
+			## 無 spawn_clone 特性(例:clone 本身)→ 單獨逃走,連戰繼續
+			return {
+				"outcome": FailureOutcome.FOX_FLEE,
+				"narrative": "灰兔複製體沒了氣力,消失於草叢深處。",
 			}
 		"wolf":
 			return {

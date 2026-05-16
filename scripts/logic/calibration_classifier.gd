@@ -16,26 +16,23 @@ enum State {
 
 
 ## 分類。
-## result: Resolution.resolve() 的回傳;weakness_range: 該敵人弱點類型陣列;
+## result: Resolution.resolve() 的回傳(typed,ADR-0003);weakness_range: 該敵人弱點類型陣列;
 ## total_committed: 本擊總張數。
-static func classify(result: Dictionary, weakness_range: Array, total_committed: int) -> int:
-	var ohk: bool = result.get("ohk", false)
-	var shortfalls: Dictionary = result.get("shortfalls", {})
-	var contributions: Dictionary = result.get("contributions", {})
-	var requirements: Dictionary = result.get("requirements", {})
-	var passing_paths: Array = result.get("passing_paths", [])
+static func classify(result: StrikeResult, weakness_range: Array, total_committed: int) -> int:
+	if result == null:
+		return State.BIG_SHORTFALL
 
-	if ohk:
+	if result.ohk:
 		## 玩家通過的最佳路徑餘裕(actual - required)
 		var best_margin := -9999
-		for p in passing_paths:
-			var m: int = shortfalls.get(p, 0)
+		for p in result.passing_paths:
+			var m: int = result.shortfalls.get(p, 0)
 			if m > best_margin:
 				best_margin = m
 		## 最便宜路徑(最低需求)
 		var min_req := 9999
-		for t in requirements:
-			var rv: int = requirements[t]
+		for t in result.requirements:
+			var rv: int = result.requirements[t]
 			if rv < min_req:
 				min_req = rv
 		if best_margin <= 0:
@@ -47,17 +44,17 @@ static func classify(result: Dictionary, weakness_range: Array, total_committed:
 	else:
 		## 失敗:找最接近達標的路徑(shortfall 最大 = 最不負)
 		var closest_gap := -9999
-		for t in shortfalls:
-			var g: int = shortfalls[t]
+		for t in result.shortfalls:
+			var g: int = result.shortfalls[t]
 			if g > closest_gap:
 				closest_gap = g
 		## 是否完全沒投資弱點類型
 		var weakness_contribution := 0
 		for t in weakness_range:
-			weakness_contribution += contributions.get(t, 0)
+			weakness_contribution += result.contributions.get(t, 0)
 		var total_contribution := 0
-		for t in contributions:
-			total_contribution += contributions[t]
+		for t in result.contributions:
+			total_contribution += result.contributions[t]
 		if total_contribution > 0 and weakness_contribution == 0:
 			return State.WRONG_TYPE
 		elif closest_gap >= -2:

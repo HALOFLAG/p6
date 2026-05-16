@@ -47,4 +47,9 @@
 
 兩者互補:`docs/B__Design_specifications/卡牌設計原則.md` 寫「卡有 lock_class 三分類」(現況);若 ADR 存在則是「為何採三分類而非四分類」(歷史決策)。
 
-目前 P6 已有 ADR-0001(ResourceLibrary autoload);後續從 `0002` 開始遞增。
+目前 P6 已有:
+- ADR-0001:ResourceLibrary autoload
+- ADR-0002:BattleView 純 script 控制器
+- ADR-0003:StrikeResult 內嵌進 BattleRecord
+
+後續從 `0004` 開始遞增。

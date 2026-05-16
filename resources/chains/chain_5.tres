@@ -6,8 +6,8 @@
 script = ExtResource("1")
 id = "chain_5"
 display_label = "連戰 5:異變"
-enemies = Array[String](["rabbit_default", "rabbit_default", "mutant_wolf_default"])
+enemies = Array[String](["gray_rabbit_default", "gray_rabbit_default", "mutant_wolf_default"])
 tutorial_retry = false
 post_chain_supply = ""
-narrative_pre = "草叢間還有兩隻兔子。但再深一步——巨大的陰影出現在樹後,左臂呈現極深的黑色。"
+narrative_pre = "草叢間還有兩隻灰兔。但再深一步——巨大的陰影出現在樹後,左臂呈現極深的黑色。"
 narrative_post = "異變的巨狼倒下。父親拿起斷臂,深思良久。「這裡不對勁。你回去等我。」"

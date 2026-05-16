@@ -22,7 +22,6 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-EventBus="*res://scripts/autoload/event_bus.gd"
 CampaignContext="*res://scripts/autoload/campaign_context.gd"
 SaveSystem="*res://scripts/autoload/save_system.gd"
 GameState="*res://scripts/autoload/game_state.gd"

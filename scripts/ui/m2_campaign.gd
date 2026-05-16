@@ -3,12 +3,11 @@ extends Control
 ## M2 戰役場景。整合連戰結構 + 整備補給 + 失敗代價 + 教學重來 + 自動存檔。
 ## 對應 開發里程碑.md M2。
 ##
-## 階段四:Phase 驅動的常駐三區塊 —— 全程同一個框架,沒有全螢幕模式跳變。
-##   上層 StageZone:場景 + 敘事文字區 + 雙頭像 + 連戰進度(敵人立繪只在戰鬥時出現)
-##   中層 StrikeZone:BattleContent(戰鬥)/ PhaseContent(敘事按鈕、整備介面)隨 phase 切換
-##   下層 InventoryZone:卡組牌堆 + 選項,永遠在
-## 整備為「固定補給」—— 中層 PhaseContent 只做呈現,玩家動作 = 確認收下。
-## 戰役 / 連戰邏輯(Phase 狀態機、失敗代價、整備、存檔)維持不變。
+## 階段五:戰鬥-zone UI 抽到 BattleView(對應 ADR-0002)。
+##   host 仍主導 Phase 狀態機(INTRO/PRE_CHAIN/IN_BATTLE/POST_CHAIN/SUPPLY/ENDING/GAME_OVER)、
+##   enemy_queue / FailureHandler 派遣 / 整備 / 教學重來 / 紀錄 / 存檔,
+##   並擁有跨 phase widgets(portrait_pair / progress_indicator / dialogue_bubble / narrative_box)。
+##   戰鬥-zone(pile / strike timeline / status panel / enemy figure / 連戰預覽)由 view 處理。
 
 enum Phase {
 	INTRO,        ## 戰役開場敘事
@@ -24,22 +23,19 @@ const CAMPAIGN_ID := "prologue_first_half"
 const HUB_SCENE := "res://scenes/hub.tscn"
 const PROLOGUE_SOUVENIR := "mutant_wolf_arm"
 
-## 連戰預覽:點連戰序列 → 立繪左移、剩餘敵人殘影排在其右後方
-const ENEMY_FIGURE_NORMAL := Vector2(1040, 92)
-const ENEMY_FIGURE_PREVIEW := Vector2(600, 92)
-const AFTERIMAGE_SIZE := Vector2(140, 130)
-const AFTERIMAGE_START_X := 700.0
-const AFTERIMAGE_STEP_X := 160.0  ## 殘影間距(>140 寬度 → 完全不重疊,方便辨識)
-const AFTERIMAGE_Y := 92.0
-
 # ============ 戰役狀態 ============
 var campaign_def: CampaignDefinition
 var chains: Array = []  ## Array[ChainDefinition]
 var deck: Array[DeckEntry] = []
 var phase: int = Phase.INTRO
 var chain_index: int = 0
-var enemy_queue: Array = []  ## Array of Dict: { instance_id, enemy_instance, enemy_template, is_elite, label }
+var enemy_queue: Array[EnemyEncounter] = []  ## 連戰當前 + 後續敵人;typed wrapper(Candidate B Phase A)
 var chain_defeated_count: int = 0  ## 此次連戰已擊敗的敵人數(右側連戰序列用)
+## 連戰進度狀態序列(2026-05-17)。每一筆 = "defeated" / "escaped"。
+## 連戰開始 / 教學重來時清空;OHK 後 append "defeated";失敗逃跑類(FOX_FLEE / WOLF_ELITE_PROMOTION /
+## GRAY_RABBIT_CLONE_SPAWN / RABBIT_CHAIN_FLEE)append "escaped"。
+## ProgressIndicator 視覺 = 此序列 + ["current"](若 queue 非空)+ ["pending" × queue.size - 1]。
+var chain_progress_states: Array[String] = []
 var engine: BattleEngine = null
 var retry_count: int = 0
 var deck_snapshot_for_retry: Dictionary = {}
@@ -70,28 +66,20 @@ var battle_in_chain_counter: int = 0    ## 此嘗試中已記錄的戰鬥數(每
 
 const ADVENTURE_JOURNAL_SCENE := preload("res://scenes/adventure_journal.tscn")
 
-# ============ 常駐 widget ============
+# ============ host 持有的跨 phase widgets ============
 var portrait_pair: PortraitPair
 var progress_indicator: ProgressIndicator
-var enemy_widget: EnemyWidget
 var dialogue_bubble: DialogueBubble
-var card_piles: Dictionary = {}  ## { card_id: CardPile }
 
-var _preview_mode: bool = false
-var _preview_afterimages: Array[ColorRect] = []
+# ============ BattleView(戰鬥-zone UI 控制器)============
+var view: BattleView
 
 
 func _ready() -> void:
 	_load_resources()
 	_build_overlays()
-	_build_card_piles()
-	end_strike_button.pressed.connect(_on_end_strike_pressed)
-	advance_button.pressed.connect(_on_advance_pressed)
+	_build_view()
 	record_button.pressed.connect(_on_record_button_pressed)
-	enemy_figure.mouse_filter = Control.MOUSE_FILTER_STOP
-	enemy_figure.gui_input.connect(_on_enemy_figure_input)
-	progress_slot.mouse_filter = Control.MOUSE_FILTER_STOP
-	progress_slot.gui_input.connect(_on_progress_slot_input)
 	_enter_phase(Phase.INTRO)
 
 
@@ -116,7 +104,7 @@ func _load_resources() -> void:
 
 
 # ============================
-#  常駐 widget 建立
+#  host overlays + BattleView 建立
 # ============================
 
 func _build_overlays() -> void:
@@ -134,20 +122,35 @@ func _build_overlays() -> void:
 	dialogue_bubble.position = Vector2(110, 8)
 
 
-## 庫存區牌堆塊(卡型靜態,建立一次,數量於 _refresh 更新)。
-func _build_card_piles() -> void:
-	for child in pile_slot.get_children():
-		child.queue_free()
-	card_piles.clear()
-	for card_id in ResourceLibrary.cards():
-		var card: CardDefinition = ResourceLibrary.card(card_id)
-		if card == null:
-			continue
-		var pile := CardPile.new()
-		pile_slot.add_child(pile)
-		pile.setup(card)
-		pile.pile_clicked.connect(_on_pile_clicked.bind(card_id))
-		card_piles[card_id] = pile
+func _build_view() -> void:
+	view = BattleView.new()
+	view.attach({
+		"pile_slot": pile_slot,
+		"strike_slot": strike_slot,
+		"status_content": status_content,
+		"enemy_figure": enemy_figure,
+		"enemy_figure_label": enemy_figure_label,
+		"enemy_info_slot": enemy_info_slot,
+		"end_strike_button": end_strike_button,
+		"advance_button": advance_button,
+		"progress_slot": progress_slot,
+		"strike_info_label": strike_info_label,
+	})
+	## 連戰預覽 — Callable 註冊一次,view 在玩家開啟預覽時 pull;
+	## enemy_queue 的多個變動點不必再記得 refresh preview(ADR-0002 §連帶決策)。
+	view.set_preview_source(_compute_upcoming_preview)
+	view.strike_committed.connect(_on_strike_committed)
+	view.advance_pressed.connect(_on_advance_pressed)
+
+
+## 預覽 source — 回傳「當前敵人之後」每隻敵人的類別色。
+func _compute_upcoming_preview() -> Array[Color]:
+	var out: Array[Color] = []
+	for i in range(1, enemy_queue.size()):
+		var enc: EnemyEncounter = enemy_queue[i]
+		if enc.enemy_template != null:
+			out.append(UiPalette.enemy_class_color(enc.enemy_template.enemy_class))
+	return out
 
 
 # ============================
@@ -215,89 +218,69 @@ func _begin_chain() -> void:
 	if chain.tutorial_retry:
 		deck_snapshot_for_retry = DeckManager.snapshot(deck)
 		retry_count = 0
-	## 建立 enemy_queue
+	## 建立 enemy_queue(typed EnemyEncounter)
 	enemy_queue.clear()
 	chain_defeated_count = 0
+	chain_progress_states.clear()
 	battle_in_chain_counter = 0
 	for inst_id in chain.enemies:
-		enemy_queue.append(_build_enemy_entry(inst_id, false))
+		var enc := _build_enemy_entry(inst_id, false)
+		if enc != null:
+			enemy_queue.append(enc)
 	_enter_phase(Phase.IN_BATTLE)
 
 
-func _build_enemy_entry(instance_id: String, is_elite: bool) -> Dictionary:
-	var inst: EnemyInstance = ResourceLibrary.enemy_instance(instance_id)
-	if inst == null:
-		return {}
-	var tmpl: EnemyTemplate = ResourceLibrary.enemy_template(inst.template_id)
-	var label: String = inst.display_name
-	if is_elite:
-		label = "[菁英化 ⚠] " + label
-	return {
-		"instance_id": instance_id,
-		"enemy_instance": inst,
-		"enemy_template": tmpl,
-		"is_elite": is_elite,
-		"label": label,
-	}
+## 建一個 EnemyEncounter,組顯示用 label(含菁英 prefix)存進 label_override。
+## 找不到 instance → 回 null;caller 必須檢查。
+func _build_enemy_entry(instance_id: String, is_elite: bool) -> EnemyEncounter:
+	var enc := EnemyEncounter.from_chain(instance_id, is_elite)
+	if enc == null:
+		return null
+	var base_name: String = enc.enemy_instance.display_name
+	enc.label_override = ("[菁英化 ⚠] " if is_elite else "") + base_name
+	return enc
 
 
 func _start_next_enemy() -> void:
 	if enemy_queue.is_empty():
 		_complete_chain()
 		return
-	var entry: Dictionary = enemy_queue[0]
-	engine = BattleEngine.new(entry["enemy_instance"], entry["enemy_template"], deck, ResourceLibrary.cards())
-	_setup_enemy_visuals(entry)
-	_refresh_chain_sequence()
-	_refresh_battle_ui()
-
-
-## 為當前敵人建立 / 更新立繪與情報欄,重置預覽 / 情報展開 / 對話泡。
-func _setup_enemy_visuals(entry: Dictionary) -> void:
-	var tmpl: EnemyTemplate = entry["enemy_template"]
-	var inst: EnemyInstance = entry["enemy_instance"]
-	enemy_figure.color = UiPalette.enemy_class_color(tmpl.enemy_class)
-	enemy_figure_label.text = "%s\n(點擊查看情報)" % str(entry.get("label", inst.display_name))
-
-	for child in enemy_info_slot.get_children():
-		child.queue_free()
-	enemy_widget = EnemyWidget.new()
-	enemy_info_slot.add_child(enemy_widget)
-	enemy_widget.set_anchors_preset(Control.PRESET_FULL_RECT)
-	enemy_widget.setup(tmpl, inst, entry.get("is_elite", false), str(entry.get("label", "")))
-	enemy_widget.set_remaining(enemy_queue.size())
-
-	_set_preview_mode(false)
-	_apply_enemy_info_state(false)
+	var enc: EnemyEncounter = enemy_queue[0]
+	engine = BattleEngine.new(enc.enemy_instance, enc.enemy_template, deck, ResourceLibrary.cards())
+	view.set_engine(engine)
+	view.set_encounter(enc, enemy_queue.size())
 	portrait_pair.set_speaking("none")
 	dialogue_bubble.hide_bubble()
+	_refresh_chain_sequence()
 
 
-func _on_resolution(result: Dictionary) -> void:
-	if engine == null:
+## view 結束本擊後:戰後校準分類 → 紀錄 → 派遣失敗 / OHK 後續。
+func _on_strike_committed(result: StrikeResult) -> void:
+	if engine == null or result == null:
 		return
-	var entry: Dictionary = enemy_queue[0]
-	var is_ohk: bool = result.get("ohk", false)
+	var enc: EnemyEncounter = enemy_queue[0]
+	var is_ohk: bool = result.ohk
 	## 戰後校準分類(6 種對話狀態)
-	var weakness_range: Array = entry["enemy_template"].weakness_range
+	var weakness_range: Array = enc.enemy_template.weakness_range
 	var total_committed: int = engine.strike.size()
 	var cal_state := CalibrationClassifier.classify(result, weakness_range, total_committed)
 	last_calibration_text = _build_calibration_text(cal_state)
 	if is_ohk:
 		## 先寫手記紀錄(read 當前 enemy_queue[0] / engine 狀態),再做隊伍變動
-		_record_battle(entry, result, cal_state, -1)
+		_record_battle(enc, result, cal_state, -1)
 		enemy_queue.pop_front()
 		chain_defeated_count += 1
-		_after_battle_result(true, entry, "")
+		chain_progress_states.append("defeated")
+		_after_battle_result(true, enc, "")
 	else:
 		var outcome := FailureHandler.resolve_failure(
-			entry["enemy_template"],
-			entry["enemy_instance"],
-			entry.get("is_elite", false),
+			enc.enemy_template,
+			enc.enemy_instance,
+			enc.is_elite,
 			_current_chain().tutorial_retry,
 		)
-		_record_battle(entry, result, cal_state, int(outcome.get("outcome", -1)))
-		_handle_failure(outcome, entry)
+		_record_battle(enc, result, cal_state, int(outcome.get("outcome", -1)))
+		_handle_failure(outcome, enc)
 
 
 func _build_calibration_text(cal_state: int) -> String:
@@ -313,7 +296,7 @@ func _build_calibration_text(cal_state: int) -> String:
 	return "[%s] %s\n（玩家)%s" % [display, npc_line, player_line]
 
 
-func _handle_failure(outcome: Dictionary, entry: Dictionary) -> void:
+func _handle_failure(outcome: Dictionary, enc: EnemyEncounter) -> void:
 	var narrative: String = outcome.get("narrative", "")
 	match outcome.get("outcome", -1):
 		FailureHandler.FailureOutcome.TUTORIAL_RETRY:
@@ -321,23 +304,37 @@ func _handle_failure(outcome: Dictionary, entry: Dictionary) -> void:
 		FailureHandler.FailureOutcome.RABBIT_CHAIN_FLEE:
 			## 兔子失敗 → 連戰中所有兔子(含當前這隻)逃走移出;非兔子敵人留下,連戰繼續
 			var fled := 0
-			var remaining: Array = []
+			var remaining: Array[EnemyEncounter] = []
 			for e in enemy_queue:
-				if e["enemy_template"].id == "rabbit":
+				if e.template_id() == "rabbit":
 					fled += 1
 				else:
 					remaining.append(e)
 			enemy_queue = remaining
-			_after_battle_result(false, entry, "%s(共 %d 隻兔子逃走)。連戰繼續。" % [narrative, fled])
+			for i in fled:  ## 每隻逃走的都算「未成功擊敗」(順序近似,RABBIT_CHAIN_FLEE 目前未啟用)
+				chain_progress_states.append("escaped")
+			_after_battle_result(false, enc, "%s(共 %d 隻兔子逃走)。連戰繼續。" % [narrative, fled])
 		FailureHandler.FailureOutcome.FOX_FLEE:
 			enemy_queue.pop_front()
-			_after_battle_result(false, entry, narrative)
+			chain_progress_states.append("escaped")
+			_after_battle_result(false, enc, narrative)
 		FailureHandler.FailureOutcome.WOLF_ELITE_PROMOTION:
-			## 把當前敵人標記菁英並排到 queue 末尾
+			## 把當前敵人標記菁英並排到 queue 末尾(原狼算「未成功擊敗」,菁英版是新 chip 進 queue)
 			enemy_queue.pop_front()
-			var elite_entry := _build_enemy_entry(entry["instance_id"], true)
-			enemy_queue.append(elite_entry)
-			_after_battle_result(false, entry, narrative)
+			chain_progress_states.append("escaped")
+			var elite_enc := _build_enemy_entry(enc.instance_id(), true)
+			if elite_enc != null:
+				enemy_queue.append(elite_enc)
+			_after_battle_result(false, enc, narrative)
+		FailureHandler.FailureOutcome.GRAY_RABBIT_CLONE_SPAWN:
+			## 灰兔 default 逃走 + clone 插入 queue[0](當前緊接後位置)
+			enemy_queue.pop_front()
+			chain_progress_states.append("escaped")
+			var clone_id: String = str(outcome.get("clone_instance_id", ""))
+			var clone_enc := _build_enemy_entry(clone_id, false)
+			if clone_enc != null:
+				enemy_queue.insert(0, clone_enc)
+			_after_battle_result(false, enc, narrative)
 		FailureHandler.FailureOutcome.GAME_OVER:
 			_trigger_game_over(narrative)
 
@@ -348,11 +345,13 @@ func _trigger_tutorial_retry(narrative: String) -> void:
 	var chain: ChainDefinition = _current_chain()
 	enemy_queue.clear()
 	chain_defeated_count = 0
+	chain_progress_states.clear()
 	battle_in_chain_counter = 0
 	chain_attempt_for_journal += 1  ## 教學重來也算一次嘗試
 	for inst_id in chain.enemies:
-		enemy_queue.append(_build_enemy_entry(inst_id, false))
-	EventBus.emit_signal("tutorial_retry_triggered", retry_count)
+		var enc := _build_enemy_entry(inst_id, false)
+		if enc != null:
+			enemy_queue.append(enc)
 	## 切到敘事顯示重來提示,點繼續再進戰鬥
 	var dialogue := TutorialRetry.get_dialogue_text(retry_count)
 	_show_narrative(
@@ -463,7 +462,6 @@ func _enter_nonbattle_view() -> void:
 	enemy_figure.visible = false
 	enemy_info_slot.visible = false
 	progress_slot.visible = false  ## 連戰序列只在戰鬥中出現
-	_set_preview_mode(false)
 	dialogue_bubble.hide_bubble()
 	portrait_pair.set_speaking("none")
 
@@ -497,37 +495,12 @@ func _show_supply(sp: SupplyPhase, summary: Dictionary) -> void:
 		chips.add_child(none)
 	else:
 		for cid in changes:
-			chips.add_child(_make_supply_chip(cid, changes[cid]))
+			var chip := SupplyChip.new()
+			chip.setup(cid, changes[cid])
+			chips.add_child(chip)
 
 	var btn := box.add_button("收下補給 / 繼續")
 	btn.pressed.connect(_advance_to_next_chain_or_ending)
-
-
-## 單一補給卡塊:卡名 + ±N(類型色邊框)。
-func _make_supply_chip(card_id: String, delta: int) -> PanelContainer:
-	var card: CardDefinition = ResourceLibrary.card(card_id)
-	var cn := str(card_id)
-	var primary := "none"
-	if card != null:
-		cn = card.card_name
-		primary = UiPalette.card_primary_type(card)
-	var chip := PanelContainer.new()
-	chip.custom_minimum_size = Vector2(120, 64)
-	chip.add_theme_stylebox_override("panel", UiPalette.make_panel(UiPalette.PANEL_BG_LIGHT, UiPalette.type_color(primary), 2))
-	var vb := VBoxContainer.new()
-	chip.add_child(vb)
-	var name_lbl := Label.new()
-	name_lbl.text = cn
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_lbl.add_theme_color_override("font_color", UiPalette.TEXT_MAIN)
-	vb.add_child(name_lbl)
-	var delta_lbl := Label.new()
-	delta_lbl.text = "%s%d" % ["+" if delta >= 0 else "", delta]
-	delta_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	delta_lbl.add_theme_font_size_override("font_size", 18)
-	delta_lbl.add_theme_color_override("font_color", UiPalette.OK_COLOR if delta >= 0 else UiPalette.FAIL_COLOR)
-	vb.add_child(delta_lbl)
-	return chip
 
 
 ## 在 PhaseContent 建一個敘事對話框(略內縮),回傳給呼叫端塞按鈕 / 內容。
@@ -558,39 +531,8 @@ func _show_battle() -> void:
 
 
 # ============================
-#  戰鬥輸入
+#  Advance(view 通知 host)
 # ============================
-
-func _on_pile_clicked(card_id: String) -> void:
-	if engine == null or engine.phase != BattleEngine.Phase.PLACE:
-		return
-	if not engine.place_card(card_id):
-		return
-	_refresh_battle_ui()
-
-
-func _on_unplace_button_pressed(index: int) -> void:
-	if engine == null:
-		return
-	if engine.unplace_card_at(index):
-		_refresh_battle_ui()
-
-
-func _on_lock_button_pressed(index: int) -> void:
-	if engine == null:
-		return
-	if engine.lock_card_at(index):
-		_refresh_battle_ui()
-
-
-func _on_end_strike_pressed() -> void:
-	if engine == null or not engine.can_commit():
-		return
-	_set_preview_mode(false)  ## 結算前收掉連戰預覽,避免殘影殘留到結算 / 對話狀態
-	var result := engine.commit_strike()
-	_refresh_battle_ui()
-	_on_resolution(result)
-
 
 func _on_advance_pressed() -> void:
 	if engine == null or engine.phase != BattleEngine.Phase.RESOLVED:
@@ -601,191 +543,24 @@ func _on_advance_pressed() -> void:
 	_start_next_enemy()
 
 
-## 點敵人立繪 → 切換敵人情報欄展開 / 收合。
-func _on_enemy_figure_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_apply_enemy_info_state(not enemy_info_slot.visible)
-
-
-## 敵人情報收合 / 展開:立繪固定不動,情報欄在立繪左側出現。與連戰預覽互斥。
-func _apply_enemy_info_state(expanded: bool) -> void:
-	if expanded and _preview_mode:
-		_set_preview_mode(false)
-	enemy_info_slot.visible = expanded
-
-
-## 點連戰序列 → 切換連戰預覽(再次點擊回歸原樣)。
-## 只在 PLACE 階段可開:此時 enemy_queue[0] 必為當前敵人,殘影計數(size-1)才準確。
-func _on_progress_slot_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if phase != Phase.IN_BATTLE or engine == null or engine.phase != BattleEngine.Phase.PLACE:
-			return
-		_set_preview_mode(not _preview_mode)
-
-
-## 連戰預覽開 / 關:開 → 立繪左移、生成剩餘敵人殘影排在其右後方;關 → 歸位、清除。
-func _set_preview_mode(on: bool) -> void:
-	_preview_mode = on
-	for ghost in _preview_afterimages:
-		ghost.get_parent().remove_child(ghost)
-		ghost.queue_free()
-	_preview_afterimages.clear()
-	if on:
-		enemy_info_slot.visible = false
-		enemy_figure.position = ENEMY_FIGURE_PREVIEW
-		_spawn_preview_afterimages()
-	else:
-		enemy_figure.position = ENEMY_FIGURE_NORMAL
-
-
-## 生成連戰預覽殘影:enemy_queue 中「當前敵人之後」的每隻 → 一個半透明色塊(各用其類別色)。
-func _spawn_preview_afterimages() -> void:
-	var upcoming := enemy_queue.size() - 1
-	if upcoming <= 0:
-		return
-	var stage := enemy_figure.get_parent()
-	var figure_index := enemy_figure.get_index()
-	for i in upcoming:
-		var entry: Dictionary = enemy_queue[i + 1]
-		var class_color := UiPalette.enemy_class_color(entry["enemy_template"].enemy_class)
-		var ghost := ColorRect.new()
-		ghost.color = Color(class_color.r, class_color.g, class_color.b, maxf(0.5 - i * 0.08, 0.15))
-		ghost.position = Vector2(AFTERIMAGE_START_X + i * AFTERIMAGE_STEP_X, AFTERIMAGE_Y)
-		ghost.size = AFTERIMAGE_SIZE
-		ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		stage.add_child(ghost)
-		stage.move_child(ghost, figure_index)  ## 移到立繪之前 → 畫在立繪後方
-		_preview_afterimages.append(ghost)
-
-
 # ============================
-#  戰鬥 UI 更新(狀態驅動)
+#  結算後:host 自訂 status 渲染(取代 view 的通用顯示)
 # ============================
-
-func _refresh_battle_ui() -> void:
-	if engine == null:
-		return
-	if enemy_widget != null:
-		enemy_widget.set_revealed(engine.revealed_info)
-	_refresh_piles()
-	_refresh_strike()
-	_refresh_status()
-	_refresh_buttons()
-
-
-func _refresh_piles() -> void:
-	var is_place := engine != null and engine.phase == BattleEngine.Phase.PLACE
-	for card_id in card_piles:
-		var pile: CardPile = card_piles[card_id]
-		var entry := DeckManager.find_entry(deck, card_id)
-		var remaining: int = entry.count_remaining if entry != null else 0
-		## in_strike 只在 PLACE 階段扣:結算後 commit_strike 已把 locked 卡從卡組消耗。
-		var in_strike := _count_in_strike(card_id) if is_place else 0
-		var available := remaining - in_strike
-		pile.set_count(available)
-		pile.set_enabled(is_place and available > 0)
-
-
-## 本擊區時間線:Lock 卡在左、Place 卡在右,同一條 HBox。
-func _refresh_strike() -> void:
-	for child in strike_slot.get_children():
-		child.queue_free()
-	var is_place := engine.phase == BattleEngine.Phase.PLACE
-
-	## ---- 已 Lock 的卡(定格)----
-	var locked_groups := _group_pool_cards(engine.strike.locked_cards)
-	for card_id in locked_groups:
-		var info: Dictionary = locked_groups[card_id]
-		strike_slot.add_child(_make_card_widget(info["card"], CardWidget.State.LOCKED, "Locked ×%d" % info["count"]))
-	for c in engine.strike.locked_cards:
-		if c.lock_class == "none":
-			continue
-		strike_slot.add_child(_make_card_widget(c, CardWidget.State.LOCKED, "Locked"))
-
-	## ---- Place 中的卡(可調整)----
-	var placed_groups := _group_pool_cards(engine.strike.placed_cards)
-	for card_id in placed_groups:
-		var info: Dictionary = placed_groups[card_id]
-		var w := _make_card_widget(info["card"], CardWidget.State.IN_PLACE, "Place ×%d" % info["count"])
-		if is_place:
-			var unplace_btn := w.add_action_button("−1" if info["count"] > 1 else "Unplace")
-			unplace_btn.pressed.connect(_on_unplace_button_pressed.bind(info["last_index"]))
-		strike_slot.add_child(w)
-	for i in engine.strike.placed_cards.size():
-		var c: CardDefinition = engine.strike.placed_cards[i]
-		if c.lock_class == "none":
-			continue
-		var w := _make_card_widget(c, CardWidget.State.IN_PLACE, "Place")
-		if is_place:
-			var unplace_btn := w.add_action_button("Unplace")
-			unplace_btn.pressed.connect(_on_unplace_button_pressed.bind(i))
-			var hint := " (揭露弱點)" if c.lock_class == "optional" else (" (必須)" if c.lock_class == "required" else "")
-			var lock_btn := w.add_action_button("Lock" + hint)
-			lock_btn.pressed.connect(_on_lock_button_pressed.bind(i))
-		strike_slot.add_child(w)
-
-	if strike_slot.get_child_count() == 0:
-		var hint := Label.new()
-		hint.text = "(時間線:尚未 Place 任何卡)"
-		hint.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
-		strike_slot.add_child(hint)
-
-	strike_info_label.text = "本擊張數:%d  (本擊上限暫時停用)" % engine.strike.size()
-
-
-func _make_card_widget(card: CardDefinition, state: int, subtitle: String) -> CardWidget:
-	var w := CardWidget.new()
-	w.setup(card)
-	w.set_subtitle(subtitle)
-	w.set_state(state)
-	return w
-
-
-## 右側面板:PLACE 階段顯示本擊狀態加總;RESOLVED 由 _after_battle_result 接管。
-func _refresh_status() -> void:
-	if engine.phase != BattleEngine.Phase.PLACE:
-		return
-	for child in status_content.get_children():
-		child.queue_free()
-	var title := Label.new()
-	title.text = "本擊狀態"
-	title.add_theme_color_override("font_color", UiPalette.ACCENT)
-	status_content.add_child(title)
-	var counts := engine.strike.get_type_counts()
-	var mixed := engine.strike.get_mixed_count()
-	status_content.add_child(_make_status_row("衝擊", counts.get("impact", 0)))
-	status_content.add_child(_make_status_row("穿刺", counts.get("pierce", 0)))
-	status_content.add_child(_make_status_row("燃燒", counts.get("burn", 0)))
-	status_content.add_child(_make_status_row("混合", mixed))
-
-
-func _make_status_row(type_label: String, value: int) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	var name_label := Label.new()
-	name_label.text = type_label
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_label.add_theme_color_override("font_color", UiPalette.TEXT_MAIN)
-	row.add_child(name_label)
-	var value_label := Label.new()
-	value_label.text = str(value)
-	value_label.add_theme_color_override("font_color", UiPalette.TEXT_MAIN)
-	row.add_child(value_label)
-	return row
-
 
 ## 結算後:狀態面板顯示判定 + 需求 bar(+ 失敗敘述);對話泡浮出戰後校準。
-func _after_battle_result(is_ohk: bool, entry: Dictionary, failure_narrative: String) -> void:
+## 此呼叫在 view._refresh_all() 之後(view 已先寫了通用 RESOLVED 顯示),host 覆寫之。
+func _after_battle_result(is_ohk: bool, enc: EnemyEncounter, failure_narrative: String) -> void:
 	for child in status_content.get_children():
 		child.queue_free()
 	var verdict := Label.new()
 	if is_ohk:
-		verdict.text = "✓ 擊敗 %s" % str(entry.get("label", ""))
+		verdict.text = "✓ 擊敗 %s" % enc.label_override
 		verdict.add_theme_color_override("font_color", UiPalette.OK_COLOR)
 	else:
-		verdict.text = "✗ 對 %s 失敗" % str(entry.get("label", ""))
+		verdict.text = "✗ 對 %s 失敗" % enc.label_override
 		verdict.add_theme_color_override("font_color", UiPalette.FAIL_COLOR)
 	status_content.add_child(verdict)
-	status_content.add_child(RequirementBar.build_group(engine.result))
+	status_content.add_child(RequirementBar.build_group(engine.result as StrikeResult))
 	if failure_narrative != "":
 		var fn := Label.new()
 		fn.text = failure_narrative
@@ -798,22 +573,12 @@ func _after_battle_result(is_ohk: bool, entry: Dictionary, failure_narrative: St
 	portrait_pair.set_speaking("npc")
 	dialogue_bubble.show_line("父親 — 戰後校準", last_calibration_text)
 
-	## advance 按鈕啟用
-	end_strike_button.disabled = true
+	## advance 按鈕啟用(view 在 RESOLVED 時不主動 enable,host 決定何時啟用 + 文字)
 	advance_button.disabled = false
-	advance_button.text = "繼續" if not enemy_queue.is_empty() else "結束連戰"
+	view.set_advance_label("繼續" if not enemy_queue.is_empty() else "結束連戰")
 
 	## 連戰序列:擊敗 / 逃跑後即時更新(剛擊敗的敵人劃掉)
 	_refresh_chain_sequence()
-
-
-func _refresh_buttons() -> void:
-	if engine == null:
-		return
-	end_strike_button.disabled = not engine.can_commit()
-	## advance 按鈕:結算前禁用;結算後由 _after_battle_result 啟用。
-	if engine.phase != BattleEngine.Phase.RESOLVED:
-		advance_button.disabled = true
 
 
 func _refresh_header() -> void:
@@ -821,44 +586,18 @@ func _refresh_header() -> void:
 		inv_title.text = "庫存區(點牌堆 Place 一張) — 卡組共 %d 張" % DeckManager.total_count(deck)
 
 
-## 右側連戰序列:顯示「此次連戰」的敵人 —— 已擊敗劃掉(✓)、當前(▶)、後續(○)。
-## 數量 = 已擊敗數 + enemy_queue 剩餘數;連戰結束 / 非戰鬥時由 _enter_nonbattle_view 收掉。
+## 右側連戰序列:顯示「此次連戰」每隻敵人的狀態(2026-05-17 加入「未成功擊敗 ✗」)。
+## defeated(✓ OHK)/ escaped(✗ 逃走 / 菁英化退場 / clone spawn)/ current(▶)/ pending(○)。
+## 連戰結束 / 非戰鬥時由 _enter_nonbattle_view 收掉。
 func _refresh_chain_sequence() -> void:
 	if progress_indicator == null:
 		return
-	var total := chain_defeated_count + enemy_queue.size()
-	progress_indicator.setup(total, chain_defeated_count)
-
-
-# ============================
-#  輔助
-# ============================
-
-## 將 lock_class="none" 的卡按 id 分組,記錄該 id 最後出現的索引(供 Unplace 使用)。
-func _group_pool_cards(cards: Array[CardDefinition]) -> Dictionary:
-	var groups: Dictionary = {}
-	for i in cards.size():
-		var c: CardDefinition = cards[i]
-		if c.lock_class != "none":
-			continue
-		if not groups.has(c.id):
-			groups[c.id] = { "card": c, "count": 0, "last_index": i }
-		groups[c.id]["count"] += 1
-		groups[c.id]["last_index"] = i
-	return groups
-
-
-func _count_in_strike(card_id: String) -> int:
-	if engine == null:
-		return 0
-	var n := 0
-	for c in engine.strike.placed_cards:
-		if c.id == card_id:
-			n += 1
-	for c in engine.strike.locked_cards:
-		if c.id == card_id:
-			n += 1
-	return n
+	var states: Array[String] = chain_progress_states.duplicate()
+	if not enemy_queue.is_empty():
+		states.append("current")
+		for i in range(1, enemy_queue.size()):
+			states.append("pending")
+	progress_indicator.setup_states(states)
 
 
 # ============================
@@ -883,9 +622,9 @@ func _deck_to_dict() -> Dictionary:
 	return d
 
 
-## 寫一筆戰鬥紀錄到冒險手記。entry = enemy_queue[0],呼叫前 queue 未變動。
+## 寫一筆戰鬥紀錄到冒險手記。enc = enemy_queue[0],呼叫前 queue 未變動。
 ## failure_outcome = -1 為 OHK;否則為 FailureHandler.FailureOutcome 值。
-func _record_battle(entry: Dictionary, result: Dictionary, cal_state: int, failure_outcome: int) -> void:
+func _record_battle(enc: EnemyEncounter, result: StrikeResult, cal_state: int, failure_outcome: int) -> void:
 	var rec := BattleRecord.new()
 	var now := int(Time.get_unix_time_from_system())
 	rec.battle_id = "%s_c%d_p%d_a%d_%d" % [
@@ -894,20 +633,15 @@ func _record_battle(entry: Dictionary, result: Dictionary, cal_state: int, failu
 	rec.chain_index = chain_index
 	rec.position_in_chain = battle_in_chain_counter
 	rec.retry_count = chain_attempt_for_journal
-	rec.enemy_template_id = entry["enemy_template"].id
-	rec.enemy_instance_id = entry["enemy_instance"].instance_id
-	rec.combat_state = entry["enemy_instance"].combat_state
-	rec.is_elite = bool(entry.get("is_elite", false))
+	rec.enemy_template_id = enc.template_id()
+	rec.enemy_instance_id = enc.instance_id()
+	rec.combat_state = enc.enemy_instance.combat_state
+	rec.is_elite = enc.is_elite
 	## 序章前半:所有 elite 都是失敗造成的;之後若有原生 elite chain 再分流
 	rec.is_elite_from_failure = rec.is_elite
 	rec.revealed_info = (engine.revealed_info as Dictionary).duplicate(true)
 	rec.strike_cards = _count_strike_cards()
-	rec.contributions = (result.get("contributions", {}) as Dictionary).duplicate()
-	rec.mixed_count = int(result.get("mixed_count", 0))
-	rec.ohk = bool(result.get("ohk", false))
-	rec.passing_paths = (result.get("passing_paths", []) as Array).duplicate()
-	rec.requirements = (result.get("requirements", {}) as Dictionary).duplicate()
-	rec.shortfalls = (result.get("shortfalls", {}) as Dictionary).duplicate()
+	rec.result = result  ## typed StrikeResult,ADR-0003
 	rec.calibration_state = cal_state
 	rec.failure_outcome = failure_outcome
 	rec.timestamp = now

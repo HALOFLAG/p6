@@ -6,7 +6,7 @@
 script = ExtResource("1")
 id = "chain_3"
 display_label = "連戰 3:狼嚎漸近"
-enemies = Array[String](["rabbit_default", "fox_default", "wolf_default"])
+enemies = Array[String](["gray_rabbit_default", "fox_default", "wolf_default"])
 tutorial_retry = false
 post_chain_supply = "supply_3"
 narrative_pre = "遠方傳來狼嚎。父親將矛換成弓:「狼會記恨,記住這點。」"

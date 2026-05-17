@@ -1,6 +1,6 @@
 # ADR-0005:紀念品條件採事件 derive + 集中 evaluator
 
-- 狀態:Accepted
+- 狀態:Accepted(§RecordButton 精英入口 badge 被 [ADR-0008](0008-chain-timeline-widget.md) 取代)
 - 日期:2026-05-17
 - 決策者:haloflag01
 

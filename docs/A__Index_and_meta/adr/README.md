@@ -52,5 +52,9 @@
 - ADR-0002:BattleView 純 script 控制器
 - ADR-0003:StrikeResult 內嵌進 BattleRecord
 - ADR-0004:冒險手記 MapView 嚴格走過版 + NarrativePage 共用版型
+- ADR-0005:紀念品條件採事件 derive + 集中 evaluator(§badge 部分被 ADR-0008 取代)
+- ADR-0006:冒險手記 attempt 結構(schema v3 + chip switcher)
+- ADR-0007:MapView latest inline 主軸 + old retries 為上方分支
+- ADR-0008:連戰時間軸 widget(BattleView 內常駐 + 點擊跳轉)
 
-後續從 `0005` 開始遞增。
+後續從 `0009` 開始遞增。

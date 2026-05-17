@@ -39,13 +39,14 @@ offset_top = 8.0
 offset_right = 96.0
 offset_bottom = 108.0
 
-[node name="ProgressSlot" type="Control" parent="StageZone"]
+[node name="ChainTimelineSlot" type="Control" parent="StageZone"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 1238.0
+offset_left = 520.0
 offset_top = 8.0
-offset_right = 1276.0
-offset_bottom = 232.0
+offset_right = 1240.0
+offset_bottom = 60.0
+mouse_filter = 1
 
 [node name="PlayerFigure" type="ColorRect" parent="StageZone"]
 layout_mode = 1
@@ -99,7 +100,7 @@ visible = false
 layout_mode = 1
 anchors_preset = 0
 offset_left = 518.0
-offset_top = 6.0
+offset_top = 44.0
 offset_right = 1024.0
 offset_bottom = 234.0
 

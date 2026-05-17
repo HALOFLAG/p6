@@ -6,7 +6,7 @@ extends Control
 ## 階段五:戰鬥-zone UI 抽到 BattleView(對應 ADR-0002)。
 ##   host 仍主導 Phase 狀態機(INTRO/PRE_CHAIN/IN_BATTLE/POST_CHAIN/SUPPLY/ENDING/GAME_OVER)、
 ##   enemy_queue / FailureHandler 派遣 / 整備 / 教學重來 / 紀錄 / 存檔,
-##   並擁有跨 phase widgets(portrait_pair / progress_indicator / dialogue_bubble / narrative_box)。
+##   並擁有跨 phase widgets(portrait_pair / chain_timeline / dialogue_bubble / narrative_box)。
 ##   戰鬥-zone(pile / strike timeline / status panel / enemy figure / 連戰預覽)由 view 處理。
 
 enum Phase {
@@ -53,7 +53,7 @@ var current_campaign_attempt: int = 1
 # ============ Node refs ============
 @onready var stage_zone: Control = $StageZone
 @onready var portrait_slot: Control = $StageZone/PortraitSlot
-@onready var progress_slot: Control = $StageZone/ProgressSlot
+@onready var chain_timeline_slot: Control = $StageZone/ChainTimelineSlot
 @onready var enemy_figure: ColorRect = $StageZone/EnemyFigure
 @onready var enemy_figure_label: Label = $StageZone/EnemyFigure/EnemyFigureLabel
 @onready var enemy_info_slot: Control = $StageZone/EnemyInfoSlot
@@ -72,7 +72,7 @@ const ADVENTURE_JOURNAL_SCENE := preload("res://scenes/adventure_journal.tscn")
 
 # ============ host 持有的跨 phase widgets ============
 var portrait_pair: PortraitPair
-var progress_indicator: ProgressIndicator
+var chain_timeline: ChainTimeline
 var dialogue_bubble: DialogueBubble
 
 # ============ BattleView(戰鬥-zone UI 控制器)============
@@ -84,94 +84,16 @@ func _ready() -> void:
 	_build_overlays()
 	_build_view()
 	record_button.pressed.connect(_on_record_button_pressed)
-	_setup_record_button_badge()
 	_enter_phase(Phase.INTRO)
 
 
-## 開冒險手記 overlay(m2 內任何 phase 都可開;色塊 pass 不限制 PLACE/Lock)
-## Context-aware(2026-05-17):badge 亮起 = 精英入口,自動跳上次失敗該敵人的 PageView;
-## 否則進該戰役 MapView(預設行為,跳過 WorldView)。對應 ADR-0005 + 戰鬥紀錄系統設計.md §5.4。
+## 開冒險手記 overlay(m2 內任何 phase 都可開;色塊 pass 不限制 PLACE/Lock)。
+## ADR-0008:elite context-aware 入口已搬到連戰時間軸 elite chip;
+## RecordButton 退回單純「開冒險手記主入口」按鈕,進該戰役 MapView。
 func _on_record_button_pressed() -> void:
 	var journal := ADVENTURE_JOURNAL_SCENE.instantiate()
-	var jump_battle_id := _elite_entry_battle_id()
-	if jump_battle_id != "":
-		journal.initial_battle_id = jump_battle_id
-	else:
-		journal.initial_campaign_id = CAMPAIGN_ID
+	journal.initial_campaign_id = CAMPAIGN_ID
 	add_child(journal)
-
-
-## 回傳「目前若按 RecordButton 應跳去的上次失敗 battle_id」;不應跳則 "".
-## 條件:phase==IN_BATTLE 且 enemy_queue[0].is_elite 且該敵人有歷史失敗紀錄。
-## 序章前半所有 elite 都是失敗造成的(is_elite ⇔ is_elite_from_failure),所以條件可簡化。
-func _elite_entry_battle_id() -> String:
-	if phase != Phase.IN_BATTLE or enemy_queue.is_empty():
-		return ""
-	var enc: EnemyEncounter = enemy_queue[0]
-	if not enc.is_elite:
-		return ""
-	var last_fail: BattleRecord = AdventureRecord.get_last_failure(enc.template_id())
-	if last_fail == null:
-		return ""
-	return last_fail.battle_id
-
-
-# ============================
-#  RecordButton 精英入口 badge(對應 ADR-0005 配套 + 戰鬥紀錄系統設計.md §5.2)
-# ============================
-
-var _record_badge: ColorRect
-var _record_badge_tween: Tween
-
-func _setup_record_button_badge() -> void:
-	## 紅色 10×10 圓點(用 StyleBoxFlat corner radius 模擬圓形,ColorRect 本身是方);
-	## 位置:RecordButton 右上角,偏移 -3,-3 讓圓點略懸在按鈕邊上。
-	## 預設隱藏,_refresh_record_badge 依條件啟用。
-	_record_badge = ColorRect.new()
-	_record_badge.color = Color(0.85, 0.25, 0.20, 1)
-	_record_badge.size = Vector2(10, 10)
-	_record_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_record_badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_record_badge.position = Vector2(-7, -3)  ## 半徑突出按鈕邊框
-	_record_badge.pivot_offset = Vector2(5, 5)  ## scale 從中心
-	_record_badge.visible = false
-	## 用自訂 _draw 畫圓更乾淨,但 ColorRect 簡單夠用;美術 pass 時再換
-	record_button.add_child(_record_badge)
-
-
-## 慢呼吸動畫(1-2 Hz scale 0.9↔1.0 + alpha 0.7↔1.0)。
-## badge 顯示時啟動,隱藏時停止,避免無謂 tick。
-func _start_record_badge_pulse() -> void:
-	if _record_badge_tween != null and _record_badge_tween.is_valid():
-		return
-	_record_badge_tween = create_tween()
-	_record_badge_tween.set_loops()
-	_record_badge_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_record_badge_tween.tween_property(_record_badge, "scale", Vector2(0.85, 0.85), 0.7)
-	_record_badge_tween.parallel().tween_property(_record_badge, "modulate:a", 0.7, 0.7)
-	_record_badge_tween.tween_property(_record_badge, "scale", Vector2(1.0, 1.0), 0.7)
-	_record_badge_tween.parallel().tween_property(_record_badge, "modulate:a", 1.0, 0.7)
-
-
-func _stop_record_badge_pulse() -> void:
-	if _record_badge_tween != null and _record_badge_tween.is_valid():
-		_record_badge_tween.kill()
-	_record_badge_tween = null
-
-
-## 依當前狀態刷新 badge 可見性;戰役流程關鍵節點(_enter_phase / _start_next_enemy)呼叫。
-func _refresh_record_badge() -> void:
-	if _record_badge == null:
-		return
-	var should_show: bool = _elite_entry_battle_id() != ""
-	if should_show:
-		_record_badge.visible = true
-		_record_badge.scale = Vector2.ONE
-		_record_badge.modulate.a = 1.0
-		_start_record_badge_pulse()
-	else:
-		_record_badge.visible = false
-		_stop_record_badge_pulse()
 
 
 # ============================
@@ -197,9 +119,11 @@ func _build_overlays() -> void:
 	portrait_slot.add_child(portrait_pair)
 	portrait_pair.set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	progress_indicator = ProgressIndicator.new()
-	progress_slot.add_child(progress_indicator)
-	progress_indicator.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	chain_timeline = ChainTimeline.new()
+	chain_timeline_slot.add_child(chain_timeline)
+	chain_timeline.set_anchors_preset(Control.PRESET_FULL_RECT)
+	chain_timeline.node_clicked.connect(_on_timeline_node_clicked)
+	chain_timeline.elite_lookup_clicked.connect(_on_timeline_elite_lookup)
 
 	## 對話泡 = overlay,放在 StageZone 內
 	dialogue_bubble = DialogueBubble.new()
@@ -218,7 +142,6 @@ func _build_view() -> void:
 		"enemy_info_slot": enemy_info_slot,
 		"end_strike_button": end_strike_button,
 		"advance_button": advance_button,
-		"progress_slot": progress_slot,
 		"strike_info_label": strike_info_label,
 	})
 	## 連戰預覽 — Callable 註冊一次,view 在玩家開啟預覽時 pull;
@@ -280,7 +203,6 @@ func _enter_phase(new_phase: int) -> void:
 		Phase.GAME_OVER:
 			pass  ## GAME_OVER 入口由 _trigger_game_over 呼叫,自帶 narrative
 	_refresh_header()
-	_refresh_record_badge()
 
 
 # ============================
@@ -348,7 +270,6 @@ func _start_next_enemy() -> void:
 	portrait_pair.set_speaking("none")
 	dialogue_bubble.hide_bubble()
 	_refresh_chain_sequence()
-	_refresh_record_badge()  ## queue[0] 變動 → 重評精英入口
 
 
 ## view 結束本擊後:戰後校準分類 → 紀錄 → 派遣失敗 / OHK 後續。
@@ -565,7 +486,8 @@ func _enter_nonbattle_view() -> void:
 	phase_content.visible = true
 	enemy_figure.visible = false
 	enemy_info_slot.visible = false
-	progress_slot.visible = false  ## 連戰序列只在戰鬥中出現
+	chain_timeline_slot.visible = false  ## 連戰時間軸只在戰鬥中出現
+	chain_timeline.clear_timeline()
 	dialogue_bubble.hide_bubble()
 	portrait_pair.set_speaking("none")
 
@@ -628,7 +550,7 @@ func _show_battle() -> void:
 	battle_content.visible = true
 	phase_content.visible = false
 	enemy_figure.visible = true
-	progress_slot.visible = true  ## 連戰序列:新連戰開始時出現
+	chain_timeline_slot.visible = true  ## 連戰時間軸:新連戰開始時出現
 	advance_button.disabled = true
 	advance_button.text = "繼續"
 	dialogue_bubble.hide_bubble()
@@ -690,18 +612,38 @@ func _refresh_header() -> void:
 		inv_title.text = "庫存區(點牌堆 Place 一張) — 卡組共 %d 張" % DeckManager.total_count(deck)
 
 
-## 右側連戰序列:顯示「此次連戰」每隻敵人的狀態(2026-05-17 加入「未成功擊敗 ✗」)。
-## defeated(✓ OHK)/ escaped(✗ 逃走 / 菁英化退場 / clone spawn)/ current(▶)/ pending(○)。
-## 連戰結束 / 非戰鬥時由 _enter_nonbattle_view 收掉。
+## 連戰時間軸:顯示「此次連戰」每隻敵人的狀態(ADR-0008)。
+## sealed_defeated / sealed_escaped / current / pending / pending_elite 五態,
+## 資料源 = 過去 BattleRecord + 未來 enemy_queue 混合。
+## 連戰結束 / 非戰鬥時由 _enter_nonbattle_view 清空。
 func _refresh_chain_sequence() -> void:
-	if progress_indicator == null:
+	if chain_timeline == null:
 		return
-	var states: Array[String] = chain_progress_states.duplicate()
-	if not enemy_queue.is_empty():
-		states.append("current")
-		for i in range(1, enemy_queue.size()):
-			states.append("pending")
-	progress_indicator.setup_states(states)
+	chain_timeline.refresh(
+		CAMPAIGN_ID,
+		current_campaign_attempt,
+		chain_index,
+		chain_attempt_for_journal,
+		enemy_queue,
+	)
+
+
+## 連戰時間軸 sealed chip 點擊:跳該 BattleRecord 的 PageView。
+func _on_timeline_node_clicked(battle_id: String) -> void:
+	var journal := ADVENTURE_JOURNAL_SCENE.instantiate()
+	journal.initial_battle_id = battle_id
+	add_child(journal)
+
+
+## 連戰時間軸 pending elite chip 點擊:跳該敵人上次失敗 PageView
+## (取代 ADR-0005 RecordButton badge 行為)。
+func _on_timeline_elite_lookup(template_id: String) -> void:
+	var last_fail: BattleRecord = AdventureRecord.get_last_failure(template_id)
+	if last_fail == null:
+		return
+	var journal := ADVENTURE_JOURNAL_SCENE.instantiate()
+	journal.initial_battle_id = last_fail.battle_id
+	add_child(journal)
 
 
 # ============================

@@ -12,8 +12,11 @@ extends Control
 ##
 ## 入口差異:
 ##   - Hub 進來(JournalBook 點擊):initial_campaign_id 留空 → 顯示 WorldView
-##   - m2 進來(RecordButton 點擊):caller 設 initial_campaign_id 為當前戰役 id →
+##   - m2 進來(RecordButton 點擊,平時):caller 設 initial_campaign_id 為當前戰役 id →
 ##     直接顯示 MapView(該戰役),省一層;BackButton「← 返回世界」仍可進 WorldView 看其他戰役
+##   - m2 進來(精英入口 badge 點擊):caller 設 initial_battle_id 為上次失敗該敵人的 battle_id →
+##     直接顯示該場戰鬥的 PageView(對應 戰鬥紀錄系統設計.md §5.4 / ADR-0005 配套)
+##     找不到 → fallback 走 initial_campaign_id / WorldView
 
 ## 地圖佈局參數
 const MAP_START_X := 120.0
@@ -29,9 +32,13 @@ const MAP_PREP_GAP := 24.0
 const MAIN_AXIS_X := 160.0                ## 主軸節點中心 X
 const MAIN_AXIS_START_Y := 30.0           ## 第一個主軸節點中心 Y
 const MAIN_NODE_RADIUS := 14.0            ## 可點節點半徑(敘事 / 整備)
-const MAIN_NODE_RADIUS_CHAIN := 8.0       ## 連戰主節點半徑 — 縮小作為「不可點」affordance(2026-05-17)
+const MAIN_NODE_RADIUS_CHAIN := 12.0      ## 連戰主節點半徑(M5-S5:8→12,主軸節點放大強化對比)
 const MAIN_NODE_SPACING := 70.0           ## 主軸節點 center-to-center 間距
 const MAIN_AXIS_LINE_WIDTH := 2.0
+## M5-S5 / Issue 2:latest retry 的戰鬥節點 inline 主軸,從連戰主節點向右展開
+const INLINE_BATTLE_NODE_RADIUS := 10.0   ## 主軸 inline 戰鬥節點半徑(回原本分支尺寸)
+const INLINE_NODE_SPACING_X := 34.0       ## inline 節點 center-to-center 水平
+const INLINE_X_OFFSET := 44.0             ## 連戰主節點 center → 第一個 inline 節點 center 水平距(拉開,避免貼太近)
 const MAIN_LABEL_X := 12.0                ## 節點 label 左邊起點
 const MAIN_LABEL_WIDTH := 132.0           ## 節點 label 寬度(留給 MAIN_AXIS_X 之前的空間)
 
@@ -49,13 +56,18 @@ const SCENE_COLOR_PREP_ADD := Color("6a5a3a")     ## 棕綠 — add_cards 整備
 const SCENE_BLOCK_HEIGHT := 180.0                 ## 右上場景區固定高(下方留給獲得區)
 
 ## 戰鬥分支佈局(ADR-0004 Sub-stage 3b)
-const BRANCH_X_OFFSET := 40.0            ## 主軸 → 第一個分支節點 center 水平距離
-const BRANCH_NODE_RADIUS := 10.0         ## 分支戰鬥節點半徑
+const BRANCH_X_OFFSET := 44.0            ## 主軸 → old 分支 stub(無功能連戰節點)center 水平距離
+const BRANCH_STUB_RADIUS := 12.0         ## old 分支開頭的無功能連戰節點半徑(M5-S5,跟主軸連戰節點同尺寸)
+const BRANCH_STUB_TO_BATTLE_CENTER := 30.0 ## stub center → 第一個戰鬥節點 center 水平距(M5-S5,拉開避免貼太近)
+const BRANCH_NODE_RADIUS := 10.0         ## 分支戰鬥節點半徑(回原本尺寸)
 const BRANCH_NODE_SPACING_X := 32.0      ## 分支節點 center-to-center 水平
 const BRANCH_ROW_SPACING_Y := 32.0       ## 重挑列 center-to-center 垂直
+const OLD_ROW_BASE_OFFSET_Y := 48.0      ## 主軸 chain center → 最近一個 old row 垂直距(M5-S5 微調:推開)
 const BRANCH_LABEL_GAP := 8.0            ## 列尾 old/new label 跟最後節點水平距
 const BRANCH_OLD_ALPHA := 0.5            ## old 列整列透明度
-const BRANCH_NEW_ALPHA := 1.0            ## new 列飽和
+const BRANCH_NEW_ALPHA := 1.0            ## (M5-S5 後 latest 不再走 branch row,此常數保留供未來擴展)
+const BRANCH_DASHED_SEG := 4.0           ## 虛線單段長度(M5-S5,old row 連接線)
+const BRANCH_DASHED_GAP := 3.0           ## 虛線間距
 
 ## WorldView campaign card 尺寸
 const WORLD_CARD_SIZE := Vector2(240, 200)
@@ -79,6 +91,17 @@ const WORLD_CARD_SIZE := Vector2(240, 200)
 ## Caller 在 add_child 前 set 此屬性 = 直接進 MapView 該戰役;留空 = 進 WorldView。
 var initial_campaign_id: String = ""
 
+## Caller 在 add_child 前 set 此屬性 = 直接進該場戰鬥 PageView(精英入口 badge 用)。
+## 優先序高於 initial_campaign_id;找不到 record 時 fallback 走 initial_campaign_id / WorldView。
+var initial_battle_id: String = ""
+
+## 當前 MapView 顯示的 attempt 號(M5-S4 / ADR-0006)。0 = 尚未選定(WorldView 階段)。
+## chip 切換時更新;進入 MapView 預設 = AdventureRecord.next_attempt_index_for(cid) - 1(=最大現有 attempt)。
+var _selected_attempt: int = 0
+
+## MapHeader chip row 動態建構,放於既有 MapHeader 內(右側)。
+var _chip_row: HBoxContainer
+
 ## 合併 + 排序的時間軸 —— 每筆 = { "kind": "battle"|"prep", "record": Resource }
 ## 內容隨 _selected_campaign_id 篩選(WorldView 階段為空,MapView 時為該戰役紀錄)
 var _timeline: Array = []
@@ -92,11 +115,91 @@ func _ready() -> void:
 	back_to_map_btn.pressed.connect(_back_to_current_map)
 	prev_page_btn.pressed.connect(_on_prev_page)
 	next_page_btn.pressed.connect(_on_next_page)
+	_setup_chip_row()
 	## 入口差異
+	if initial_battle_id != "" and _try_jump_to_battle(initial_battle_id):
+		return
 	if initial_campaign_id != "":
 		_show_map_view(initial_campaign_id)
 	else:
 		_show_world_view()
+
+
+## Chip row 初始建構(M5-S4 / ADR-0006)。
+## 放於 MapHeader 下方一條 40px 高的橫條(水平 center),藉 CenterContainer auto 置中;
+## 同時把 MapScroll offset_top 從 50 → 90 騰出空間。
+## TODO(M5-S4 後續迭代):位置 / 視覺定型後可改寫 .tscn 直接內嵌。
+func _setup_chip_row() -> void:
+	var map: Control = $MapView
+	var scroll: ScrollContainer = $MapView/MapScroll
+	scroll.offset_top = 90.0  ## 把主視圖內容下推給 chip row 騰出 40px
+	var wrap := CenterContainer.new()
+	wrap.name = "ChipRowWrap"
+	wrap.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	wrap.offset_top = 52.0
+	wrap.offset_bottom = 88.0
+	wrap.mouse_filter = Control.MOUSE_FILTER_PASS
+	map.add_child(wrap)
+	_chip_row = HBoxContainer.new()
+	_chip_row.name = "ChipRow"
+	_chip_row.add_theme_constant_override("separation", 6)
+	_chip_row.mouse_filter = Control.MOUSE_FILTER_PASS
+	wrap.add_child(_chip_row)
+
+
+## 依當前 _selected_campaign_id 重 build chips。每個 chip = 一個 Button「第 N 次」。
+## 選中 chip 用 ACCENT 邊框 + 文字色高亮;其他 chip 中性。
+## 點 chip → 切 _selected_attempt + 重 build map(_show_map_view 內處理)。
+func _rebuild_chip_row() -> void:
+	if _chip_row == null:
+		return
+	for child in _chip_row.get_children():
+		child.queue_free()
+	if _selected_campaign_id == "":
+		return
+	var attempts: Array[int] = AdventureRecord.get_attempts_for_campaign(_selected_campaign_id)
+	for att in attempts:
+		var btn := Button.new()
+		btn.text = "第 %d 次" % att
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.custom_minimum_size = Vector2(64, 28)
+		if att == _selected_attempt:
+			btn.add_theme_color_override("font_color", UiPalette.ACCENT)
+			btn.disabled = true  ## 視覺上選中,點不動
+		var captured_att: int = att
+		btn.pressed.connect(func(): _on_chip_pressed(captured_att))
+		_chip_row.add_child(btn)
+
+
+func _on_chip_pressed(attempt: int) -> void:
+	if attempt == _selected_attempt:
+		return
+	_selected_attempt = attempt
+	## 重 collect timeline(只該 attempt)+ 重 build map
+	_collect_timeline_for(_selected_campaign_id)
+	_build_map()
+	_rebuild_chip_row()
+
+
+## 嘗試直接跳到某 battle_id 的 PageView。成功 = MapView 已 prime + PageView 顯示。
+## 失敗(找不到 record / timeline 中無對應 entry)= 不動畫面,回傳 false 讓 caller fallback。
+## M5-S4 / ADR-0006:取 BattleRecord.campaign_attempt 設 _selected_attempt,確保 chip 高亮正確
+## 且 BackButton 回到該 attempt 的 MapView(非 latest)。
+func _try_jump_to_battle(battle_id: String) -> bool:
+	var found: BattleRecord = null
+	for r in AdventureRecord.battles:
+		if r.battle_id == battle_id:
+			found = r
+			break
+	if found == null:
+		return false
+	_show_map_view(found.campaign_id, found.campaign_attempt)  ## prime MapView 給 BackButton + chip 用
+	for i in _timeline.size():
+		var entry: Dictionary = _timeline[i]
+		if entry.get("kind", "") == "battle" and entry["record"].battle_id == battle_id:
+			_show_page_view(i)
+			return true
+	return false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -105,14 +208,22 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## 篩選並組 _timeline。campaign_id 空字串 = 全部(WorldView 不該呼叫此函式,但容錯處理)。
+## 篩選同時套用 `_selected_attempt`(M5-S4 / ADR-0006);_selected_attempt == 0 = 不篩 attempt
+## (WorldView 階段或從未進 MapView 過)。
 func _collect_timeline_for(campaign_id: String) -> void:
 	_timeline.clear()
 	for r in AdventureRecord.battles:
-		if campaign_id == "" or r.campaign_id == campaign_id:
-			_timeline.append({"kind": "battle", "record": r})
+		if campaign_id != "" and r.campaign_id != campaign_id:
+			continue
+		if _selected_attempt != 0 and r.campaign_attempt != _selected_attempt:
+			continue
+		_timeline.append({"kind": "battle", "record": r})
 	for r in AdventureRecord.prep_nodes:
-		if campaign_id == "" or r.campaign_id == campaign_id:
-			_timeline.append({"kind": "prep", "record": r})
+		if campaign_id != "" and r.campaign_id != campaign_id:
+			continue
+		if _selected_attempt != 0 and r.campaign_attempt != _selected_attempt:
+			continue
+		_timeline.append({"kind": "prep", "record": r})
 	_timeline.sort_custom(func(a, b): return int(a["record"].timestamp) < int(b["record"].timestamp))
 
 
@@ -130,8 +241,17 @@ func _show_world_view() -> void:
 
 
 ## 切到指定 campaign 的 MapView。campaign_id 必填。
-func _show_map_view(campaign_id: String) -> void:
+## attempt: -1(預設)= 自動選最新 attempt(ADR-0006);指定 int = 強制使用該 attempt
+## (給 _try_jump_to_battle 用,跳到正確 attempt 的 PageView)。
+func _show_map_view(campaign_id: String, attempt: int = -1) -> void:
 	_selected_campaign_id = campaign_id
+	if attempt > 0:
+		_selected_attempt = attempt
+	else:
+		## ADR-0006 預設:Latest 不論狀態。next_attempt_index_for 是「下一個會用的號」,
+		## 所以「最新已存在」= 下一號 - 1。第一次進序章無記錄 → 1 - 1 = 0 → fallback 顯示空 hint。
+		var next_idx: int = AdventureRecord.next_attempt_index_for(campaign_id)
+		_selected_attempt = max(1, next_idx - 1)
 	_collect_timeline_for(campaign_id)
 	world_view.visible = false
 	map_view.visible = true
@@ -139,12 +259,14 @@ func _show_map_view(campaign_id: String) -> void:
 	## MapHeader campaign label
 	var camp_def: CampaignDefinition = ResourceLibrary.campaign(campaign_id)
 	map_campaign_label.text = camp_def.campaign_name if camp_def != null else campaign_id
+	_rebuild_chip_row()
 	_build_map()
 
 
-## PageView BackButton callback:回到目前的 MapView(用 _selected_campaign_id)。
+## PageView BackButton callback:回到目前的 MapView(用 _selected_campaign_id + _selected_attempt)。
+## M5-S4:必須帶 _selected_attempt,否則 _show_map_view 會 reset 成 latest,失去玩家剛瀏覽的 attempt 上下文。
 func _back_to_current_map() -> void:
-	_show_map_view(_selected_campaign_id)
+	_show_map_view(_selected_campaign_id, _selected_attempt)
 
 
 func _show_page_view(index: int) -> void:
@@ -319,13 +441,24 @@ func _build_map() -> void:
 		return
 	map_empty_hint.visible = false
 
-	## Layout 主軸節點 + label;連戰節點要連帶展開戰鬥分支(3b)。
-	## 各節點以 center_y 對齊主軸;連戰主節點對齊分支第一列(ADR-0004 §8)。
+	## Layout 主軸節點 + label(M5-S5 / Issue 2 重構)。
+	## 連戰節點:latest retry 戰鬥節點 inline 主軸右側;old retries 拉到上方分支(舊在最上)。
+	## 主軸間距:預設 MAIN_NODE_SPACING 固定;有 old retries 時,該 chain 上方額外騰出垂直空間 = N_old × BRANCH_ROW_SPACING_Y。
 	var center_y := MAIN_AXIS_START_Y + MAIN_NODE_RADIUS  ## 第一個節點 center
 	var first_center_y: float = center_y
 	var last_center_y: float = center_y
 	for i in main_nodes.size():
 		var data: Dictionary = main_nodes[i]
+		## 若是 chain 且有 old retries → 上方騰出垂直空間(M5-S5)
+		## 最近 old row 距主軸 = OLD_ROW_BASE_OFFSET_Y;再往上每多一條 += BRANCH_ROW_SPACING_Y
+		var n_old: int = 0
+		if data["kind"] == "chain":
+			var ci_pre: int = int(data["chain_index"])
+			if chain_rows.has(ci_pre):
+				n_old = max(0, (chain_rows[ci_pre] as Dictionary).size() - 1)  ## 總 retries - 1 (latest)
+		if n_old > 0 and i > 0:
+			center_y += float(n_old) * BRANCH_ROW_SPACING_Y
+
 		var radius: float = _main_axis_node_radius(data["kind"])
 		var node := _make_main_axis_node(data)
 		node.position = Vector2(MAIN_AXIS_X - radius, center_y - radius)
@@ -336,7 +469,7 @@ func _build_map() -> void:
 		lbl.text = _main_axis_label_text(data)
 		lbl.position = Vector2(MAIN_LABEL_X, center_y - 9)
 		lbl.size = Vector2(MAIN_LABEL_WIDTH, 18)
-		lbl.add_theme_color_override("font_color", UiPalette.TEXT_MAIN if data["kind"] != "chain" else UiPalette.TEXT_DIM)
+		lbl.add_theme_color_override("font_color", UiPalette.TEXT_MAIN)
 		lbl.add_theme_font_size_override("font_size", 12)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -345,41 +478,57 @@ func _build_map() -> void:
 		if i == 0:
 			first_center_y = center_y
 
-		## 連戰節點要展開戰鬥分支 + 調整下一節點 Y 步距
-		var next_step_y: float = MAIN_NODE_SPACING
+		## 連戰節點:inline latest retry + 上方 old rows(M5-S5 / Issue 2)
 		if data["kind"] == "chain":
 			var ci: int = int(data["chain_index"])
 			if chain_rows.has(ci):
 				var rows_dict: Dictionary = chain_rows[ci]
 				var sorted_retries: Array = rows_dict.keys().duplicate()
-				sorted_retries.sort()
+				sorted_retries.sort()  ## 升序:retry 0 (最早) → max (latest)
 				var new_retry: int = chain_new_retry[ci]
-				for j in sorted_retries.size():
-					var retry: int = int(sorted_retries[j])
-					var row_y: float = center_y + j * BRANCH_ROW_SPACING_Y
-					_build_branch_row(rows_dict[retry], row_y, retry == new_retry)
-				## next step 要超過分支區
-				if sorted_retries.size() > 1:
-					next_step_y = (sorted_retries.size() - 1) * BRANCH_ROW_SPACING_Y + MAIN_NODE_SPACING
+				## old retries 從上往下,舊在最上
+				var old_list: Array = []
+				for r in sorted_retries:
+					if int(r) != new_retry:
+						old_list.append(int(r))
+				for j in old_list.size():
+					var retry: int = int(old_list[j])
+					## j=0 (最舊) → 最上方;j=n_old-1 → 緊鄰主軸(距 OLD_ROW_BASE_OFFSET_Y)
+					var row_y: float = center_y - OLD_ROW_BASE_OFFSET_Y - float(n_old - 1 - j) * BRANCH_ROW_SPACING_Y
+					_build_old_branch_row(rows_dict[retry], row_y)
+				## latest retry inline 主軸
+				_build_inline_battles(rows_dict[new_retry], center_y, radius)
 		last_center_y = center_y
-		center_y += next_step_y
+		center_y += MAIN_NODE_SPACING
 
 	## 補回原本 y 變數以維持下方 minimum_size 計算邏輯
 	var first_node_y: float = first_center_y
 	var last_node_y: float = last_center_y
 	var y: float = last_center_y + MAIN_NODE_RADIUS
 
-	## 動態 content width(3e):依最長分支列計算 + padding。
-	var max_row_len: int = 0
+	## 動態 content width(3e):取「最長 inline」跟「最長 old branch」二者較大值 + padding。
+	## M5-S5:inline 用 INLINE_X_OFFSET / INLINE_NODE_SPACING_X(大);old 用 BRANCH_X_OFFSET / BRANCH_NODE_SPACING_X(小)
+	var max_inline_len: int = 0
+	var max_old_len: int = 0
 	for ci in chain_rows:
-		for retry in chain_rows[ci]:
-			var row_size: int = (chain_rows[ci][retry] as Array).size()
-			if row_size > max_row_len:
-				max_row_len = row_size
-	var content_width: float = 800.0  ## 最小寬(沒分支時也至少這個寬)
-	if max_row_len > 0:
-		var row_extent: float = BRANCH_X_OFFSET + max(0.0, float(max_row_len - 1) * BRANCH_NODE_SPACING_X) + BRANCH_LABEL_GAP + 60.0
-		content_width = max(content_width, MAIN_AXIS_X + row_extent)
+		var rows_dict: Dictionary = chain_rows[ci]
+		var new_retry: int = chain_new_retry[ci]
+		for retry in rows_dict:
+			var row_size: int = (rows_dict[retry] as Array).size()
+			if int(retry) == new_retry:
+				if row_size > max_inline_len:
+					max_inline_len = row_size
+			else:
+				if row_size > max_old_len:
+					max_old_len = row_size
+	var content_width: float = 800.0
+	if max_inline_len > 0:
+		var inline_extent: float = INLINE_X_OFFSET + max(0.0, float(max_inline_len - 1) * INLINE_NODE_SPACING_X) + INLINE_BATTLE_NODE_RADIUS + 60.0
+		content_width = max(content_width, MAIN_AXIS_X + inline_extent)
+	if max_old_len > 0:
+		## old row 從主軸→ stub(BRANCH_X_OFFSET)→ bridge → 第一個戰鬥節點(BRANCH_STUB_TO_BATTLE_CENTER)→ ...
+		var old_extent: float = BRANCH_X_OFFSET + BRANCH_STUB_TO_BATTLE_CENTER + max(0.0, float(max_old_len - 1) * BRANCH_NODE_SPACING_X) + BRANCH_LABEL_GAP + 60.0
+		content_width = max(content_width, MAIN_AXIS_X + old_extent)
 
 	## 主軸垂直線(畫在節點之後但要在 z-order 下方 → 用 move_child 移到 index 0)
 	if main_nodes.size() >= 2:
@@ -432,36 +581,96 @@ func _main_axis_node_radius(kind: String) -> float:
 			return MAIN_NODE_RADIUS
 
 
-## 建一列戰鬥分支(3b)。 indices 已按 position_in_chain 排序;is_new 決定透明度 + 列尾標記。
-## 連線:主軸 → 第一個節點(水平實線)+ 各節點之間(水平實線)。
-## 3c 會加 X/框/箭頭等視覺增強;3b 純展開結構 + alpha + old/new label。
-func _build_branch_row(indices: Array, row_center_y: float, is_new: bool) -> void:
-	var alpha: float = BRANCH_NEW_ALPHA if is_new else BRANCH_OLD_ALPHA
+## M5-S5 / Issue 2:latest retry 的戰鬥節點 inline 主軸右側。
+## indices 已按 position_in_chain 排序;從連戰主節點向右展開,節點大(INLINE_BATTLE_NODE_RADIUS)。
+## 連線:主軸實線(粗 2px)從連戰主節點接到第一個 inline 節點,然後各 inline 節點之間。
+## SPAWN / PROMOTION frame + arrow 同 old row 處理,但 radius 用 INLINE_BATTLE_NODE_RADIUS。
+func _build_inline_battles(indices: Array, row_center_y: float, chain_radius: float) -> void:
 	if indices.is_empty():
 		return
-
-	## 主軸 → 第一個分支節點 連線(水平實線)
-	var first_x: float = MAIN_AXIS_X + BRANCH_X_OFFSET
+	var first_x: float = MAIN_AXIS_X + INLINE_X_OFFSET
+	## 連戰主節點 → 第一個 inline 節點 水平實線
 	var stub := ColorRect.new()
 	stub.color = UiPalette.PANEL_BORDER
-	stub.position = Vector2(MAIN_AXIS_X, row_center_y - 1)
-	stub.size = Vector2(first_x - MAIN_AXIS_X, 2)
-	stub.modulate.a = alpha
+	stub.position = Vector2(MAIN_AXIS_X + chain_radius, row_center_y - 1)
+	stub.size = Vector2(first_x - (MAIN_AXIS_X + chain_radius), 2)
 	stub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map_nodes_layer.add_child(stub)
 
-	## 各節點 + 節點間連線
-	## 用 node_centers[i] 記下每節點 center,3c 箭頭(SPAWN/PROMOTION)第二趟 loop 用到。
 	var node_centers: Array = []
 	var last_center_x: float = first_x
 	for i in indices.size():
 		var idx: int = int(indices[i])
-		var node_center_x: float = first_x + i * BRANCH_NODE_SPACING_X
+		var node_center_x: float = first_x + i * INLINE_NODE_SPACING_X
 		if i > 0:
 			var hconn := ColorRect.new()
 			hconn.color = UiPalette.PANEL_BORDER
 			hconn.position = Vector2(last_center_x, row_center_y - 1)
-			hconn.size = Vector2(BRANCH_NODE_SPACING_X, 2)
+			hconn.size = Vector2(INLINE_NODE_SPACING_X, 2)
+			hconn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			map_nodes_layer.add_child(hconn)
+		var rec: BattleRecord = _timeline[idx]["record"]
+		var node := _make_branch_battle_node(rec, idx)
+		node.position = Vector2(node_center_x - INLINE_BATTLE_NODE_RADIUS, row_center_y - INLINE_BATTLE_NODE_RADIUS)
+		node.size = Vector2(INLINE_BATTLE_NODE_RADIUS * 2, INLINE_BATTLE_NODE_RADIUS * 2)
+		map_nodes_layer.add_child(node)
+		if _node_needs_frame(rec.failure_outcome):
+			var frame := _make_node_frame(node_center_x, row_center_y, INLINE_BATTLE_NODE_RADIUS)
+			map_nodes_layer.add_child(frame)
+		node_centers.append(Vector2(node_center_x, row_center_y))
+		last_center_x = node_center_x
+
+	for i in indices.size():
+		var rec: BattleRecord = _timeline[indices[i]]["record"]
+		if not _node_needs_frame(rec.failure_outcome):
+			continue
+		var target_i: int = _find_arrow_target_index(indices, i)
+		if target_i < 0:
+			continue
+		_draw_branch_arrow(node_centers[i], node_centers[target_i], 1.0, INLINE_BATTLE_NODE_RADIUS)
+
+
+## M5-S5 / Issue 2:舊 retry 戰鬥節點拉到主軸上方,獨立 row,小節點 + 虛線連接 + 整列半透明。
+## indices 已按 position_in_chain 排序。
+## 連線:從主軸線(該 row Y)拉虛線到 stub 連戰節點;stub → 第一個戰鬥節點細實線;節點之間實線(細)。
+## 開頭加無功能連戰節點 stub(M5-S5 user feedback):視覺暗示「這是該連戰的另一次嘗試分支」。
+## 末端標 "old" 文字(latest 不再有 new 標籤,因為已 inline 主軸)。
+func _build_old_branch_row(indices: Array, row_center_y: float) -> void:
+	if indices.is_empty():
+		return
+	var alpha: float = BRANCH_OLD_ALPHA
+	var stub_x: float = MAIN_AXIS_X + BRANCH_X_OFFSET
+	## 主軸 → stub 連戰節點 虛線
+	_draw_dashed_horizontal(MAIN_AXIS_X, stub_x - BRANCH_STUB_RADIUS, row_center_y, alpha)
+	## 無功能 stub 連戰節點(跟主軸 chain 同色,縮小,不可點)
+	var stub := ColorRect.new()
+	stub.color = MAIN_NODE_COLOR_CHAIN
+	stub.position = Vector2(stub_x - BRANCH_STUB_RADIUS, row_center_y - BRANCH_STUB_RADIUS)
+	stub.size = Vector2(BRANCH_STUB_RADIUS * 2, BRANCH_STUB_RADIUS * 2)
+	stub.modulate.a = alpha
+	stub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	map_nodes_layer.add_child(stub)
+
+	## stub → 第一個戰鬥節點 細實線
+	var first_battle_x: float = stub_x + BRANCH_STUB_TO_BATTLE_CENTER
+	var bridge := ColorRect.new()
+	bridge.color = UiPalette.PANEL_BORDER
+	bridge.position = Vector2(stub_x + BRANCH_STUB_RADIUS, row_center_y - 0.5)
+	bridge.size = Vector2(first_battle_x - BRANCH_NODE_RADIUS - (stub_x + BRANCH_STUB_RADIUS), 1)
+	bridge.modulate.a = alpha
+	bridge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	map_nodes_layer.add_child(bridge)
+
+	var node_centers: Array = []
+	var last_center_x: float = first_battle_x
+	for i in indices.size():
+		var idx: int = int(indices[i])
+		var node_center_x: float = first_battle_x + i * BRANCH_NODE_SPACING_X
+		if i > 0:
+			var hconn := ColorRect.new()
+			hconn.color = UiPalette.PANEL_BORDER
+			hconn.position = Vector2(last_center_x, row_center_y - 0.5)
+			hconn.size = Vector2(BRANCH_NODE_SPACING_X, 1)
 			hconn.modulate.a = alpha
 			hconn.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			map_nodes_layer.add_child(hconn)
@@ -471,15 +680,13 @@ func _build_branch_row(indices: Array, row_center_y: float, is_new: bool) -> voi
 		node.size = Vector2(BRANCH_NODE_RADIUS * 2, BRANCH_NODE_RADIUS * 2)
 		node.modulate.a = alpha
 		map_nodes_layer.add_child(node)
-		## SPAWN / PROMOTION:加外框(節點之後加,確保框在節點旁邊但 mouse_filter IGNORE 不擋 click)
 		if _node_needs_frame(rec.failure_outcome):
-			var frame := _make_node_frame(node_center_x, row_center_y)
+			var frame := _make_node_frame(node_center_x, row_center_y, BRANCH_NODE_RADIUS)
 			frame.modulate.a = alpha
 			map_nodes_layer.add_child(frame)
 		node_centers.append(Vector2(node_center_x, row_center_y))
 		last_center_x = node_center_x
 
-	## 第二趟:SPAWN / PROMOTION 畫弧形箭頭到目標節點(同列內)
 	for i in indices.size():
 		var rec: BattleRecord = _timeline[indices[i]]["record"]
 		if not _node_needs_frame(rec.failure_outcome):
@@ -487,18 +694,33 @@ func _build_branch_row(indices: Array, row_center_y: float, is_new: bool) -> voi
 		var target_i: int = _find_arrow_target_index(indices, i)
 		if target_i < 0:
 			continue
-		_draw_branch_arrow(node_centers[i], node_centers[target_i], alpha)
+		_draw_branch_arrow(node_centers[i], node_centers[target_i], alpha, BRANCH_NODE_RADIUS)
 
-	## 列尾 old/new 文字
+	## 列尾 "old" 文字(latest 已 inline 主軸,不再有 new 標籤)
 	var lbl := Label.new()
-	lbl.text = "new" if is_new else "old"
-	lbl.position = Vector2(last_center_x + BRANCH_LABEL_GAP, row_center_y - 9)
-	lbl.size = Vector2(40, 18)
-	lbl.add_theme_color_override("font_color", UiPalette.ACCENT if is_new else UiPalette.TEXT_DIM)
-	lbl.add_theme_font_size_override("font_size", 11)
+	lbl.text = "old"
+	lbl.position = Vector2(last_center_x + BRANCH_LABEL_GAP, row_center_y - 7)
+	lbl.size = Vector2(40, 14)
+	lbl.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	lbl.add_theme_font_size_override("font_size", 10)
 	lbl.modulate.a = alpha
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map_nodes_layer.add_child(lbl)
+
+
+## M5-S5 / Issue 2:虛線(水平)— 用一系列小 ColorRect 模擬。
+func _draw_dashed_horizontal(x_from: float, x_to: float, y: float, alpha: float) -> void:
+	var x: float = x_from
+	while x < x_to:
+		var seg_end: float = min(x + BRANCH_DASHED_SEG, x_to)
+		var seg := ColorRect.new()
+		seg.color = UiPalette.PANEL_BORDER
+		seg.position = Vector2(x, y - 0.5)
+		seg.size = Vector2(seg_end - x, 1)
+		seg.modulate.a = alpha
+		seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		map_nodes_layer.add_child(seg)
+		x += BRANCH_DASHED_SEG + BRANCH_DASHED_GAP
 
 
 ## 戰鬥分支節點 — 依 failure_outcome 派遣視覺(ADR-0004 §4 + Sub-stage 3c):
@@ -565,7 +787,8 @@ func _node_needs_frame(failure: int) -> bool:
 
 
 ## 建黑色外框(透明填充 + 黑邊)圍住節點。3c。
-func _make_node_frame(center_x: float, center_y: float) -> Panel:
+## radius 參數(M5-S5):支援 inline (INLINE_BATTLE_NODE_RADIUS) 跟 old branch (BRANCH_NODE_RADIUS) 兩種尺寸。
+func _make_node_frame(center_x: float, center_y: float, radius: float) -> Panel:
 	var frame := Panel.new()
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0, 0, 0, 0)
@@ -573,7 +796,7 @@ func _make_node_frame(center_x: float, center_y: float) -> Panel:
 	sb.set_border_width_all(2)
 	sb.set_corner_radius_all(2)
 	frame.add_theme_stylebox_override("panel", sb)
-	var extent: float = BRANCH_NODE_RADIUS + 4.0
+	var extent: float = radius + 4.0
 	frame.position = Vector2(center_x - extent, center_y - extent)
 	frame.size = Vector2(extent * 2, extent * 2)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -581,9 +804,10 @@ func _make_node_frame(center_x: float, center_y: float) -> Panel:
 
 
 ## 畫弧形箭頭 from→to(3 段 Line2D + 三角頭)。在節點上方走 arch_height 高度。3c。
-func _draw_branch_arrow(from_center: Vector2, to_center: Vector2, alpha: float) -> void:
+## radius 參數(M5-S5):決定出發/到達點 Y 偏移(節點上方一點點)。
+func _draw_branch_arrow(from_center: Vector2, to_center: Vector2, alpha: float, radius: float) -> void:
 	var arch_height: float = 14.0
-	var node_top_offset: float = BRANCH_NODE_RADIUS + 5.0  ## 出發/到達在 frame 上方一點點
+	var node_top_offset: float = radius + 5.0  ## 出發/到達在 frame 上方一點點
 	var top_y: float = min(from_center.y, to_center.y) - node_top_offset - arch_height
 	## Line2D 是 Node2D(非 Control),沒有 mouse_filter — 預設不參與 Control 輸入
 	var line := Line2D.new()

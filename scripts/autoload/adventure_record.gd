@@ -10,8 +10,9 @@ extends Node
 
 const SAVE_PATH := "user://battle_records.json"
 ## v2(2026-05-16,ADR-0003):BattleRecord 內嵌 StrikeResult(原 6 個結算欄位移進 record.result)。
-## v1 disk file 讀回會在 _load_from_disk 偵測 → 自動清檔 + push_warning。
-const VERSION := 2
+## v3(2026-05-17,ADR-0006):BattleRecord / PrepNodeRecord 加 campaign_attempt 欄位。
+## 舊 disk file 版本不符 → 自動清檔 + push_warning。
+const VERSION := 3
 
 var battles: Array[BattleRecord] = []
 var prep_nodes: Array[PrepNodeRecord] = []
@@ -58,20 +59,72 @@ func get_last_failure(enemy_template_id: String) -> BattleRecord:
 
 
 ## 該戰役的所有戰鬥紀錄(地圖視圖用)。
-func get_battles_by_campaign(campaign_id: String) -> Array[BattleRecord]:
+## attempt: -1(預設)= 所有 attempt;指定 int = 只回該 attempt 的記錄(M5-S4 chip switcher 用)。
+func get_battles_by_campaign(campaign_id: String, attempt: int = -1) -> Array[BattleRecord]:
 	var result: Array[BattleRecord] = []
 	var indices: Array = _battles_by_campaign.get(campaign_id, [])
 	for i in indices:
+		if attempt != -1 and battles[i].campaign_attempt != attempt:
+			continue
 		result.append(battles[i])
 	return result
 
 
 ## 該戰役的所有整備節點紀錄。
-func get_prep_nodes_by_campaign(campaign_id: String) -> Array[PrepNodeRecord]:
+## attempt: -1(預設)= 所有 attempt;指定 int = 只回該 attempt(M5-S4)。
+func get_prep_nodes_by_campaign(campaign_id: String, attempt: int = -1) -> Array[PrepNodeRecord]:
 	var result: Array[PrepNodeRecord] = []
 	for r in prep_nodes:
+		if r.campaign_id != campaign_id:
+			continue
+		if attempt != -1 and r.campaign_attempt != attempt:
+			continue
+		result.append(r)
+	return result
+
+
+## 該戰役中是否曾發生 GAME_OVER(供 SouvenirConditions / ADR-0005 用)。
+## 跨 attempt 累計:由於 BattleRecord append-only 且跟 SaveSystem 獨立,
+## 即使玩家「接受失敗」回 Hub 再重來戰役,先前 attempt 的 GAME_OVER 仍計入。
+## 對應「失敗的疤痕永久保留」設計合約(戰鬥紀錄系統設計.md §6.5)。
+## ADR-0006 維持此 Any-attempt 行為(不加 attempt 篩選),跟 ADR-0005 的 broken_bow 邏輯一致。
+func had_game_over_in_campaign(campaign_id: String) -> bool:
+	var indices: Array = _battles_by_campaign.get(campaign_id, [])
+	for i in indices:
+		if battles[i].failure_outcome == FailureHandler.FailureOutcome.GAME_OVER:
+			return true
+	return false
+
+
+## 該戰役下一個 attempt 號(M5-S4 / ADR-0006)。
+## 用法:m2_campaign._start_campaign 開頭呼叫,assign 進 current_campaign_attempt 並寫入後續 records。
+## Derive 自現有 records max campaign_attempt + 1(無記錄 → 回 1)。
+## 對應 ADR-0005「derive over store」原則 — GameState 不另存 counter。
+func next_attempt_index_for(campaign_id: String) -> int:
+	var max_idx: int = 0
+	var indices: Array = _battles_by_campaign.get(campaign_id, [])
+	for i in indices:
+		if battles[i].campaign_attempt > max_idx:
+			max_idx = battles[i].campaign_attempt
+	return max_idx + 1
+
+
+## 該戰役有 records 的 attempt 號集合(升序去重,M5-S4 / ADR-0006)。
+## 用法:adventure_journal MapHeader chip switcher 動態 build chip。
+## 無記錄 → 回空陣列(caller 顯示「(此戰役尚無紀錄)」)。
+func get_attempts_for_campaign(campaign_id: String) -> Array[int]:
+	var seen: Dictionary = {}
+	var indices: Array = _battles_by_campaign.get(campaign_id, [])
+	for i in indices:
+		seen[battles[i].campaign_attempt] = true
+	## 整備節點也算 attempt 痕跡(M5-S4 跑空紀錄連戰但有過整備不存在,但結構對稱)
+	for r in prep_nodes:
 		if r.campaign_id == campaign_id:
-			result.append(r)
+			seen[r.campaign_attempt] = true
+	var result: Array[int] = []
+	for k in seen.keys():
+		result.append(int(k))
+	result.sort()
 	return result
 
 

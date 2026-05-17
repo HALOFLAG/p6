@@ -13,9 +13,16 @@ extends Resource
 ##   收進 typed `result: StrikeResult`
 ## - revealed_info / strike_cards / calibration_state / failure_outcome 留本層(不屬結算 output)
 ## - AdventureRecord VERSION 同步升 2;舊 v1 records 不相容,讀進來會被清掉
+##
+## 2026-05-17 schema v3(ADR-0006):
+## - 加 `campaign_attempt: int` 欄位,標識所屬 attempt(per-campaign counter 從 1)
+## - 每次玩家從 Hub 進序章 → m2_campaign._start_campaign → 新 attempt 號
+## - 「重新挑戰連戰」屬同 attempt 內 retry,不算新 attempt
+## - AdventureRecord VERSION 同步升 3;舊 v2 records 不相容,讀進來會被清掉
 
 @export var battle_id: String = ""               ## 唯一識別,通常為 campaign_chain_pos_attempt_timestamp
 @export var campaign_id: String = ""
+@export var campaign_attempt: int = 1             ## 第幾次嘗試(M5-S4 / ADR-0006);per-campaign counter
 @export var chain_index: int = -1                 ## 第幾個連戰(0-based)
 @export var position_in_chain: int = -1           ## 此次嘗試中,本場是該連戰的第幾場(0-based)
 @export var retry_count: int = 0                  ## 該連戰的嘗試次數(0 = 第一次)
@@ -47,6 +54,7 @@ func to_dict() -> Dictionary:
 	return {
 		"battle_id": battle_id,
 		"campaign_id": campaign_id,
+		"campaign_attempt": campaign_attempt,
 		"chain_index": chain_index,
 		"position_in_chain": position_in_chain,
 		"retry_count": retry_count,
@@ -68,6 +76,7 @@ static func from_dict(d: Dictionary) -> BattleRecord:
 	var r := BattleRecord.new()
 	r.battle_id = str(d.get("battle_id", ""))
 	r.campaign_id = str(d.get("campaign_id", ""))
+	r.campaign_attempt = int(d.get("campaign_attempt", 1))
 	r.chain_index = int(d.get("chain_index", -1))
 	r.position_in_chain = int(d.get("position_in_chain", -1))
 	r.retry_count = int(d.get("retry_count", 0))

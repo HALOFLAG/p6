@@ -21,7 +21,6 @@ enum Phase {
 
 const CAMPAIGN_ID := "prologue_first_half"
 const HUB_SCENE := "res://scenes/hub.tscn"
-const PROLOGUE_SOUVENIR := "mutant_wolf_arm"
 
 # ============ 戰役狀態 ============
 var campaign_def: CampaignDefinition
@@ -45,6 +44,11 @@ var last_calibration_text: String = ""
 ## 冒險手記紀錄計數(對應 戰鬥紀錄系統設計.md §6.1)
 var chain_attempt_for_journal: int = 0  ## 此連戰的嘗試次數(0=首次,失敗重挑或教學重來+1)
 var battle_in_chain_counter: int = 0    ## 此嘗試中已記錄的戰鬥數(每次 _record_battle 後 +1)
+
+## 戰役 attempt 號(M5-S4 / ADR-0006)。`_start_campaign` 開頭從 AdventureRecord derive。
+## 每場 BattleRecord / PrepNodeRecord 寫入此值;chain retry 不變動此值(同 attempt 內)。
+## SaveSystem.save_at_prep_node payload 帶此值預埋,未來 load 流程實作時讀回。
+var current_campaign_attempt: int = 1
 
 # ============ Node refs ============
 @onready var stage_zone: Control = $StageZone
@@ -80,15 +84,94 @@ func _ready() -> void:
 	_build_overlays()
 	_build_view()
 	record_button.pressed.connect(_on_record_button_pressed)
+	_setup_record_button_badge()
 	_enter_phase(Phase.INTRO)
 
 
 ## 開冒險手記 overlay(m2 內任何 phase 都可開;色塊 pass 不限制 PLACE/Lock)
-## 2026-05-17:傳 initial_campaign_id 直接進該戰役的 MapView(跳過 WorldView)
+## Context-aware(2026-05-17):badge 亮起 = 精英入口,自動跳上次失敗該敵人的 PageView;
+## 否則進該戰役 MapView(預設行為,跳過 WorldView)。對應 ADR-0005 + 戰鬥紀錄系統設計.md §5.4。
 func _on_record_button_pressed() -> void:
 	var journal := ADVENTURE_JOURNAL_SCENE.instantiate()
-	journal.initial_campaign_id = CAMPAIGN_ID
+	var jump_battle_id := _elite_entry_battle_id()
+	if jump_battle_id != "":
+		journal.initial_battle_id = jump_battle_id
+	else:
+		journal.initial_campaign_id = CAMPAIGN_ID
 	add_child(journal)
+
+
+## 回傳「目前若按 RecordButton 應跳去的上次失敗 battle_id」;不應跳則 "".
+## 條件:phase==IN_BATTLE 且 enemy_queue[0].is_elite 且該敵人有歷史失敗紀錄。
+## 序章前半所有 elite 都是失敗造成的(is_elite ⇔ is_elite_from_failure),所以條件可簡化。
+func _elite_entry_battle_id() -> String:
+	if phase != Phase.IN_BATTLE or enemy_queue.is_empty():
+		return ""
+	var enc: EnemyEncounter = enemy_queue[0]
+	if not enc.is_elite:
+		return ""
+	var last_fail: BattleRecord = AdventureRecord.get_last_failure(enc.template_id())
+	if last_fail == null:
+		return ""
+	return last_fail.battle_id
+
+
+# ============================
+#  RecordButton 精英入口 badge(對應 ADR-0005 配套 + 戰鬥紀錄系統設計.md §5.2)
+# ============================
+
+var _record_badge: ColorRect
+var _record_badge_tween: Tween
+
+func _setup_record_button_badge() -> void:
+	## 紅色 10×10 圓點(用 StyleBoxFlat corner radius 模擬圓形,ColorRect 本身是方);
+	## 位置:RecordButton 右上角,偏移 -3,-3 讓圓點略懸在按鈕邊上。
+	## 預設隱藏,_refresh_record_badge 依條件啟用。
+	_record_badge = ColorRect.new()
+	_record_badge.color = Color(0.85, 0.25, 0.20, 1)
+	_record_badge.size = Vector2(10, 10)
+	_record_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_record_badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_record_badge.position = Vector2(-7, -3)  ## 半徑突出按鈕邊框
+	_record_badge.pivot_offset = Vector2(5, 5)  ## scale 從中心
+	_record_badge.visible = false
+	## 用自訂 _draw 畫圓更乾淨,但 ColorRect 簡單夠用;美術 pass 時再換
+	record_button.add_child(_record_badge)
+
+
+## 慢呼吸動畫(1-2 Hz scale 0.9↔1.0 + alpha 0.7↔1.0)。
+## badge 顯示時啟動,隱藏時停止,避免無謂 tick。
+func _start_record_badge_pulse() -> void:
+	if _record_badge_tween != null and _record_badge_tween.is_valid():
+		return
+	_record_badge_tween = create_tween()
+	_record_badge_tween.set_loops()
+	_record_badge_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_record_badge_tween.tween_property(_record_badge, "scale", Vector2(0.85, 0.85), 0.7)
+	_record_badge_tween.parallel().tween_property(_record_badge, "modulate:a", 0.7, 0.7)
+	_record_badge_tween.tween_property(_record_badge, "scale", Vector2(1.0, 1.0), 0.7)
+	_record_badge_tween.parallel().tween_property(_record_badge, "modulate:a", 1.0, 0.7)
+
+
+func _stop_record_badge_pulse() -> void:
+	if _record_badge_tween != null and _record_badge_tween.is_valid():
+		_record_badge_tween.kill()
+	_record_badge_tween = null
+
+
+## 依當前狀態刷新 badge 可見性;戰役流程關鍵節點(_enter_phase / _start_next_enemy)呼叫。
+func _refresh_record_badge() -> void:
+	if _record_badge == null:
+		return
+	var should_show: bool = _elite_entry_battle_id() != ""
+	if should_show:
+		_record_badge.visible = true
+		_record_badge.scale = Vector2.ONE
+		_record_badge.modulate.a = 1.0
+		_start_record_badge_pulse()
+	else:
+		_record_badge.visible = false
+		_stop_record_badge_pulse()
 
 
 # ============================
@@ -185,9 +268,10 @@ func _enter_phase(new_phase: int) -> void:
 		Phase.SUPPLY:
 			_apply_supply()
 		Phase.ENDING:
-			## 戰役完成 → 標記完成 + 解鎖紀念品,返回 Hub
+			## 戰役完成 → 標記完成 + 集中 evaluator 解鎖紀念品(ADR-0005),返回 Hub
 			GameState.mark_campaign_complete(campaign_def.id)
-			GameState.unlock_souvenir(PROLOGUE_SOUVENIR)
+			for sid in SouvenirConditions.evaluate_on_campaign_complete(campaign_def.id):
+				GameState.unlock_souvenir(sid)
 			SaveSystem.clear_save()
 			_show_narrative(
 				"[b]序章前半 完成[/b]\n\n%s\n\n[color=#888](已記錄戰役完成 + 紀念品)[/color]" % campaign_def.ending_narrative,
@@ -196,6 +280,7 @@ func _enter_phase(new_phase: int) -> void:
 		Phase.GAME_OVER:
 			pass  ## GAME_OVER 入口由 _trigger_game_over 呼叫,自帶 narrative
 	_refresh_header()
+	_refresh_record_badge()
 
 
 # ============================
@@ -203,6 +288,8 @@ func _enter_phase(new_phase: int) -> void:
 # ============================
 
 func _start_campaign() -> void:
+	## ADR-0006:從 records derive 新 attempt 號,寫進所有後續 records 與 save payload。
+	current_campaign_attempt = AdventureRecord.next_attempt_index_for(campaign_def.id)
 	chain_index = 0
 	chain_attempt_for_journal = 0
 	deck = DeckManager.build_starting_deck(campaign_def.starting_deck)
@@ -261,6 +348,7 @@ func _start_next_enemy() -> void:
 	portrait_pair.set_speaking("none")
 	dialogue_bubble.hide_bubble()
 	_refresh_chain_sequence()
+	_refresh_record_badge()  ## queue[0] 變動 → 重評精英入口
 
 
 ## view 結束本擊後:戰後校準分類 → 紀錄 → 派遣失敗 / OHK 後續。
@@ -414,8 +502,10 @@ func _save_at_prep_node() -> void:
 	var deck_state: Dictionary = {}
 	for entry in deck:
 		deck_state[entry.card_id] = entry.snapshot()
+	## ADR-0006 預埋契約:campaign_attempt 寫進 payload,等未來 load 流程實作讀回(避免 load 被誤判為新 attempt)
 	SaveSystem.save_at_prep_node({
 		"campaign_id": campaign_def.id,
+		"campaign_attempt": current_campaign_attempt,
 		"chain_index_completed": chain_index,
 		"deck": deck_state,
 		"supply_applied_history": supply_applied_history,
@@ -641,9 +731,10 @@ func _deck_to_dict() -> Dictionary:
 func _record_battle(enc: EnemyEncounter, result: StrikeResult, cal_state: int, failure_outcome: int) -> void:
 	var rec := BattleRecord.new()
 	var now := int(Time.get_unix_time_from_system())
-	rec.battle_id = "%s_c%d_p%d_a%d_%d" % [
-		campaign_def.id, chain_index, battle_in_chain_counter, chain_attempt_for_journal, now]
+	rec.battle_id = "%s_att%d_c%d_p%d_a%d_%d" % [
+		campaign_def.id, current_campaign_attempt, chain_index, battle_in_chain_counter, chain_attempt_for_journal, now]
 	rec.campaign_id = campaign_def.id
+	rec.campaign_attempt = current_campaign_attempt
 	rec.chain_index = chain_index
 	rec.position_in_chain = battle_in_chain_counter
 	rec.retry_count = chain_attempt_for_journal
@@ -667,8 +758,9 @@ func _record_battle(enc: EnemyEncounter, result: StrikeResult, cal_state: int, f
 func _record_prep_node(sp: SupplyPhase, summary: Dictionary, before: Dictionary, after: Dictionary) -> void:
 	var rec := PrepNodeRecord.new()
 	var now := int(Time.get_unix_time_from_system())
-	rec.node_id = "%s_supply_%s_%d" % [campaign_def.id, sp.id, now]
+	rec.node_id = "%s_att%d_supply_%s_%d" % [campaign_def.id, current_campaign_attempt, sp.id, now]
 	rec.campaign_id = campaign_def.id
+	rec.campaign_attempt = current_campaign_attempt
 	rec.chain_index_completed = chain_index
 	rec.supply_id = sp.id
 	rec.card_pool_before = before

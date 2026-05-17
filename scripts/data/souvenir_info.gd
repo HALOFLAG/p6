@@ -21,4 +21,11 @@ const ALL := {
 		"size": Vector2(120, 100),
 		"color": Color(0.30, 0.18, 0.18, 1),
 	},
+	"broken_bow": {
+		"name": "折斷的弓",
+		"description": "在森林深處,你的弓終究斷了。但你還是把它帶回家了。",
+		"pos": Vector2(960, 420),
+		"size": Vector2(140, 90),
+		"color": Color(0.32, 0.22, 0.16, 1),
+	},
 }

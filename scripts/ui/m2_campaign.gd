@@ -84,8 +84,10 @@ func _ready() -> void:
 
 
 ## 開冒險手記 overlay(m2 內任何 phase 都可開;色塊 pass 不限制 PLACE/Lock)
+## 2026-05-17:傳 initial_campaign_id 直接進該戰役的 MapView(跳過 WorldView)
 func _on_record_button_pressed() -> void:
 	var journal := ADVENTURE_JOURNAL_SCENE.instantiate()
+	journal.initial_campaign_id = CAMPAIGN_ID
 	add_child(journal)
 
 
@@ -244,6 +246,13 @@ func _build_enemy_entry(instance_id: String, is_elite: bool) -> EnemyEncounter:
 func _start_next_enemy() -> void:
 	if enemy_queue.is_empty():
 		_complete_chain()
+		return
+	## 無卡可出 → GAME OVER 無重挑(2026-05-17)。重挑也會立刻撞同一面牆,所以不給選項。
+	if DeckManager.total_count(deck) == 0:
+		_trigger_game_over(
+			"你的箭袋空了,投石袋也空了 — 沒有資源面對下一個對手。父親在你身邊一言不發。",
+			false,
+		)
 		return
 	var enc: EnemyEncounter = enemy_queue[0]
 	engine = BattleEngine.new(enc.enemy_instance, enc.enemy_template, deck, ResourceLibrary.cards())
@@ -417,14 +426,19 @@ func _save_at_prep_node() -> void:
 #  GAME OVER
 # ============================
 
-func _trigger_game_over(narrative: String) -> void:
+## allow_retry = false 用於「無卡 GAME_OVER」直接呼叫(2026-05-17)— 重挑也會立刻撞同一面牆。
+## Safety:就算 caller 傳 true,只要 deck 已空就強制覆寫成 false —— 不然重挑會在 _start_next_enemy
+## 立刻觸發無卡 GAME_OVER,連續兩個對話框,UX 很差。
+func _trigger_game_over(narrative: String, allow_retry: bool = true) -> void:
 	phase = Phase.GAME_OVER
+	var can_retry := allow_retry and DeckManager.total_count(deck) > 0
+	var buttons: Array = []
+	if can_retry:
+		buttons.append({ "label": "重新挑戰這場連戰(卡組保留消耗)", "action": "_retry_from_failed_chain" })
+	buttons.append({ "label": "接受戰役失敗", "action": "_accept_campaign_failure" })
 	_show_narrative(
 		"[b][color=#ff7f7f]GAME OVER[/color][/b]\n\n%s" % narrative,
-		[
-			{ "label": "重新挑戰這場連戰(卡組保留消耗)", "action": "_retry_from_failed_chain" },
-			{ "label": "接受戰役失敗", "action": "_accept_campaign_failure" },
-		],
+		buttons,
 		true
 	)
 	_refresh_header()

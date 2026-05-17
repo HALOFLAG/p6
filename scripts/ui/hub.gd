@@ -17,17 +17,9 @@ const CAMPAIGN_SCENE := "res://scenes/m2_campaign.tscn"
 const PROLOGUE_ID := "prologue_first_half"
 const ADVENTURE_JOURNAL_SCENE := preload("res://scenes/adventure_journal.tscn")
 
-## 紀念品資料(色塊 pass 佔位;之後可移到 .tres 資源)
-## pos / size:在 hub 場景中的擺設位置(只放已解鎖的)
-const SOUVENIR_INFO := {
-	"mutant_wolf_arm": {
-		"name": "異變的巨狼斷臂",
-		"description": "左臂呈現極深的黑色。森林深處的異變,終究跟著你回家了。",
-		"pos": Vector2(980, 180),
-		"size": Vector2(120, 100),
-		"color": Color(0.30, 0.18, 0.18, 1),  ## 暗紅褐
-	},
-}
+## 紀念品定義 — 2026-05-17 抽出到 SouvenirInfo class(跨場景共用)。
+## 留 alias 維持向下相容,實際資料來自 SouvenirInfo.ALL。
+const SOUVENIR_INFO := SouvenirInfo.ALL
 
 @onready var hub_scene: Control = $HubScene
 @onready var father_figure: ColorRect = $HubScene/FatherFigure

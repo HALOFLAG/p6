@@ -25,6 +25,7 @@ func _has_progress() -> bool:
 func _on_new_game() -> void:
 	GameState.reset_progress()
 	SaveSystem.clear_save()
+	AdventureRecord.clear_all()  ## 2026-05-17 修:新遊戲應清掉冒險手記紀錄,跟 hub DevPanel「重置進度」一致
 	get_tree().change_scene_to_file(HUB_SCENE)
 
 

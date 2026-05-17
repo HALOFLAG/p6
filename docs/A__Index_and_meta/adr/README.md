@@ -51,5 +51,6 @@
 - ADR-0001:ResourceLibrary autoload
 - ADR-0002:BattleView 純 script 控制器
 - ADR-0003:StrikeResult 內嵌進 BattleRecord
+- ADR-0004:冒險手記 MapView 嚴格走過版 + NarrativePage 共用版型
 
-後續從 `0004` 開始遞增。
+後續從 `0005` 開始遞增。

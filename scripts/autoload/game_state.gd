@@ -50,8 +50,11 @@ func load_progress() -> void:
 
 
 ## 開發測試用:清除所有進度。
+## 2026-05-17:加 save_progress() 雙保險 — 即使 DirAccess.remove_absolute 失敗,
+## 也會把空狀態寫回 disk,確保下次 load_progress 讀到清空狀態。
 func reset_progress() -> void:
 	completed_campaigns.clear()
 	unlocked_souvenirs.clear()
 	if FileAccess.file_exists(PROGRESS_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(PROGRESS_PATH))
+	save_progress()  ## 防 deletion silent fail;寫空狀態覆蓋(或建立空檔)

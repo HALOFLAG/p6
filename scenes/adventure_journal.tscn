@@ -56,6 +56,50 @@ offset_right = -16.0
 offset_bottom = 46.0
 text = "× 關閉"
 
+[node name="WorldView" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 60.0
+
+[node name="WorldBg" type="ColorRect" parent="WorldView"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.12, 0.13, 0.18, 1)
+
+[node name="WorldTitle" type="Label" parent="WorldView"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 24.0
+offset_bottom = 60.0
+mouse_filter = 2
+text = "世界地圖 — 選一個戰役翻看紀錄"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.85, 0.77, 0.48, 1)
+
+[node name="WorldCampaignsLayer" type="HBoxContainer" parent="WorldView"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -440.0
+offset_top = -120.0
+offset_right = 440.0
+offset_bottom = 120.0
+mouse_filter = 1
+alignment = 1
+theme_override_constants/separation = 24
+
 [node name="MapView" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -71,12 +115,43 @@ anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.18, 0.16, 0.13, 1)
 
+[node name="MapHeader" type="Control" parent="MapView"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 50.0
+
+[node name="BackToWorldButton" type="Button" parent="MapView/MapHeader"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 8.0
+offset_right = 176.0
+offset_bottom = 42.0
+text = "← 返回世界"
+
+[node name="MapCampaignLabel" type="Label" parent="MapView/MapHeader"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 200.0
+offset_top = 8.0
+offset_right = -16.0
+offset_bottom = 42.0
+mouse_filter = 2
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.85, 0.77, 0.48, 1)
+
 [node name="MapScroll" type="ScrollContainer" parent="MapView"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-horizontal_scroll_mode = 0
+offset_top = 50.0
+horizontal_scroll_mode = 1
 
 [node name="MapNodesLayer" type="Control" parent="MapView/MapScroll"]
 layout_mode = 2
@@ -88,7 +163,7 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-text = "(尚無紀錄 — 先去打場仗吧)"
+text = "(此戰役尚無紀錄 — 先去打場仗吧)"
 horizontal_alignment = 1
 vertical_alignment = 1
 theme_override_colors/font_color = Color(0.54, 0.55, 0.59, 1)
@@ -166,20 +241,12 @@ anchors_preset = 0
 offset_left = 20.0
 offset_top = 70.0
 offset_right = 630.0
-offset_bottom = 500.0
+offset_bottom = 640.0
 
 [node name="RightPage" type="PanelContainer" parent="PageView"]
 layout_mode = 1
 anchors_preset = 0
 offset_left = 650.0
 offset_top = 70.0
-offset_right = 1260.0
-offset_bottom = 500.0
-
-[node name="BottomTextStrip" type="PanelContainer" parent="PageView"]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 20.0
-offset_top = 520.0
 offset_right = 1260.0
 offset_bottom = 640.0
